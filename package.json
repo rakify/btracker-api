@@ -1,0 +1,28 @@
+{
+  "name": "btracker-api",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@clerk/backend": "^1.8.0",
+    "@neondatabase/serverless": "^0.10.4",
+    "dotenv": "^16.4.1",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.8.3",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250701.0",
+    "@types/node": "^20.19.39",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5",
+    "vitest": "^4.1.4",
+    "wrangler": "^4.83.0"
+  }
+}
