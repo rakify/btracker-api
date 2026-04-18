@@ -50,9 +50,9 @@ export const storesService = {
       });
     }
 
-    // Assign Admin role to store creator
+    // Assign Admin role to store creator (not the admin who activated)
     await db.insert(userRoles).values({
-      userId,
+      userId: updatedStore.userId,
       roleId: adminRole.id,
       storeId,
     });
