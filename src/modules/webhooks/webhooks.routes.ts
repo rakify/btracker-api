@@ -11,15 +11,24 @@ interface ClerkWebhookPayload {
   type: string;
   data: {
     id: string;
-    email_addresses: { email_address: string }[];
+    email_addresses: { email_address: string; verification?: { status: string } }[];
     primary_email_address_id: string;
     first_name?: string;
     last_name?: string;
     name?: string;
+    username?: string;
     image_url?: string;
     public_metadata?: Record<string, unknown>;
+    private_metadata?: Record<string, unknown>;
+    unsafe_metadata?: Record<string, unknown>;
+    phone_numbers?: { phone_number: string; verification?: { status: string } }[];
+    password_enabled?: boolean;
+    two_factor_enabled?: boolean;
+    banned?: boolean;
     created_at?: number;
     updated_at?: number;
+    last_sign_in_at?: number;
+    external_accounts?: { provider: string; email?: string }[];
     deleted?: boolean;
   };
 }
@@ -60,19 +69,28 @@ webhooksRoutes.post('/clerk', async (c) => {
   try {
     switch (type) {
       case 'user.created': {
-        const primaryEmail = data.email_addresses.find(
-          (e) => e.email_address === data.email_addresses[0]?.email_address
-        )?.email_address || null;
+        const primaryEmail = data.email_addresses?.[0]?.email_address || null;
+        const emailVerified = data.email_addresses?.[0]?.verification?.status === 'verified';
+        const phoneNumber = data.phone_numbers?.[0]?.phone_number || null;
+        const signUpMethod = data.external_accounts?.[0]?.provider || 'email';
 
         await db.insert(users).values({
           id: data.id,
           clerkUserId: data.id,
           email: primaryEmail,
+          emailVerified,
           name: data.first_name && data.last_name
             ? `${data.first_name} ${data.last_name}`
             : data.name || 'User',
-          emailVerified: true,
-          image: data.image_url || null,
+          avatarUrl: data.image_url || null,
+          username: data.username || null,
+          phoneNumber,
+          signUpMethod,
+          passwordEnabled: data.password_enabled || false,
+          twoFactorEnabled: data.two_factor_enabled || false,
+          banned: data.banned || false,
+          publicMetadata: data.public_metadata || {},
+          lastSignInAt: data.last_sign_in_at ? new Date(data.last_sign_in_at) : null,
           createdAt: new Date(data.created_at || Date.now()),
           updatedAt: new Date(data.updated_at || Date.now()),
         }).onConflictDoNothing();
@@ -81,17 +99,25 @@ webhooksRoutes.post('/clerk', async (c) => {
       }
 
       case 'user.updated': {
-        const primaryEmail = data.email_addresses.find(
-          (e) => e.email_address === data.email_addresses[0]?.email_address
-        )?.email_address || null;
+        const primaryEmail = data.email_addresses?.[0]?.email_address || null;
+        const emailVerified = data.email_addresses?.[0]?.verification?.status === 'verified';
+        const phoneNumber = data.phone_numbers?.[0]?.phone_number || null;
 
         await db.update(users)
           .set({
             email: primaryEmail,
+            emailVerified,
             name: data.first_name && data.last_name
               ? `${data.first_name} ${data.last_name}`
-              : data.name || 'User',
-            image: data.image_url || null,
+              : data.name || null,
+            avatarUrl: data.image_url || null,
+            username: data.username || null,
+            phoneNumber,
+            passwordEnabled: data.password_enabled,
+            twoFactorEnabled: data.two_factor_enabled,
+            banned: data.banned,
+            publicMetadata: data.public_metadata || {},
+            lastSignInAt: data.last_sign_in_at ? new Date(data.last_sign_in_at) : null,
             updatedAt: new Date(data.updated_at || Date.now()),
           })
           .where(eq(users.clerkUserId, data.id));
@@ -101,6 +127,17 @@ webhooksRoutes.post('/clerk', async (c) => {
 
       case 'user.deleted': {
         await db.delete(users)
+          .where(eq(users.clerkUserId, data.id));
+
+        break;
+      }
+
+      case 'session.created': {
+        await db.update(users)
+          .set({
+            lastSignInAt: new Date(),
+            updatedAt: new Date(),
+          })
           .where(eq(users.clerkUserId, data.id));
 
         break;

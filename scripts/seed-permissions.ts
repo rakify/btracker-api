@@ -1,6 +1,4 @@
-import { getDb } from './db/client.js';
-import { permissions } from './db/schema/index.js';
-import { createClient } from '@neondatabase/serverless';
+import { neon } from '@neondatabase/serverless';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -37,7 +35,7 @@ const allPermissions = [
 
 async function seed() {
   console.log('Seeding permissions...');
-  const sql = createClient({ connectionString: DATABASE_URL });
+  const sql = neon(DATABASE_URL);
 
   let inserted = 0;
   for (const perm of allPermissions) {

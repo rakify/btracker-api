@@ -131,7 +131,7 @@ export const adminRepository = {
         name: users.name,
         email: users.email,
         emailVerified: users.emailVerified,
-        image: users.image,
+        image: users.avatarUrl,
         createdAt: users.createdAt,
       })
       .from(users);

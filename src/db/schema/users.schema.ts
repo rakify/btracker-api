@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, uuid } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, uuid, jsonb } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('btracker_users', {
   id: uuid('id').primaryKey(),
@@ -6,7 +6,15 @@ export const users = pgTable('btracker_users', {
   name: text('name'),
   email: text('email').unique(),
   emailVerified: boolean('email_verified').notNull(),
-  image: text('image'),
+  avatarUrl: text('avatar_url'),
+  username: text('username'),
+  phoneNumber: text('phone_number'),
+  signUpMethod: text('sign_up_method'), // 'google', 'email', 'oauth', etc.
+  passwordEnabled: boolean('password_enabled').notNull().default(false),
+  twoFactorEnabled: boolean('two_factor_enabled').notNull().default(false),
+  banned: boolean('banned').notNull().default(false),
+  lastSignInAt: timestamp('last_sign_in_at'),
+  publicMetadata: jsonb('public_metadata'),
   createdAt: timestamp('created_at'),
   updatedAt: timestamp('updated_at'),
 });

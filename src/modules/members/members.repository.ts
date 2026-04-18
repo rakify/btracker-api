@@ -17,7 +17,7 @@ export const membersRepository = {
         storeId: userRoles.storeId,
         userName: users.name,
         userEmail: users.email,
-        userImage: users.image,
+        userImage: users.avatarUrl,
         roleName: roles.name,
       })
       .from(userRoles)
@@ -48,7 +48,7 @@ export const membersRepository = {
         storeId: userRoles.storeId,
         userName: users.name,
         userEmail: users.email,
-        userImage: users.image,
+        userImage: users.avatarUrl,
         roleName: roles.name,
       })
       .from(userRoles)
