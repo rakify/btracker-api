@@ -4,7 +4,7 @@ import { users } from '../db/schema/index.js';
 import { eq } from 'drizzle-orm';
 
 export interface AuthBindings {
-  CLERK_SECRET_KEY: string;
+  CLERK_WEBHOOK_SECRET: string;
   DATABASE_URL: string;
 }
 
@@ -60,18 +60,7 @@ export async function authMiddleware(c: Context<{ Bindings: AuthBindings }>, nex
       userCache.set(clerkUserId, userData);
       c.set('auth', { userId: existingUser.id, clerkUserId, email: existingUser.email || '' });
     } else {
-      const [newUser] = await db.insert(users).values({
-        id: crypto.randomUUID(),
-        clerkUserId,
-        name: payload.name || 'User',
-        email: null,
-        emailVerified: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }).returning();
-      const userData = { clerkUserId, internalId: newUser.id, email: '', expires: now + CACHE_TTL };
-      userCache.set(clerkUserId, userData);
-      c.set('auth', { userId: newUser.id, clerkUserId, email: '' });
+      return c.json({ success: false, error: 'Unauthorized', message: 'User not found' }, 401);
     }
 
     await next();

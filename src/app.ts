@@ -4,6 +4,7 @@ import { logger } from 'hono/logger';
 import { timing } from 'hono/timing';
 
 import { CORS_ORIGINS } from './config/constants.js';
+import { webhooksRoutes } from './modules/webhooks/webhooks.routes.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { permissionsRoutes } from './modules/permissions/permissions.routes.js';
 import { productsRoutes } from './modules/products/products.routes.js';
@@ -49,6 +50,9 @@ export function createApp() {
       },
     })
   );
+
+  // Webhook routes (no auth needed)
+  app.route('/webhooks', webhooksRoutes);
 
   // Protected routes
   app.use('/api/*', authMiddleware);
