@@ -6,7 +6,8 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "build": "tsc",
-    "seed": "node --import dotenv/config scripts/seed-permissions.ts"
+    "seed": "node --import dotenv/config scripts/seed-permissions.ts",
+    "set-super-admin": "node --import dotenv/config scripts/set-super-admin.ts"
   },
   "dependencies": {
     "@clerk/backend": "^1.8.0",

@@ -70,3 +70,11 @@ adminRoutes.post('/stores/:id/activate', async (c) => {
     return errorResponse(c, 400, 'ActivationError', message);
   }
 });
+
+adminRoutes.get('/is-admin', async (c) => {
+  const auth = getAuth(c);
+  if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
+
+  const isAdmin = await adminService.isAdmin(c.env, auth.userId);
+  return successResponse(c, { isAdmin });
+});
