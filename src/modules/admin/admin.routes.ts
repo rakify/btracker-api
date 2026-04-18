@@ -1,11 +1,13 @@
 import { Hono } from 'hono';
 import { getDb } from '../../db/client.js';
+import { desc, eq } from 'drizzle-orm';
 import { permissions } from '../../db/schema/index.js';
 import { stores } from '../../db/schema/stores.schema.js';
 import { roles } from '../../db/schema/roles.schema.js';
 import { adminRoles } from '../../db/schema/admin-roles.schema.js';
 import { getAuth } from '../../middlewares/auth.middleware.js';
 import { adminService } from './admin.service.js';
+import { storesService } from '../stores/stores.service.js';
 import { errorResponse, successResponse } from '../../lib/response.js';
 import type { Env } from '../../config/env.js';
 
@@ -42,6 +44,22 @@ adminRoutes.get('/setup-progress', async (c) => {
   };
 
   return successResponse(c, progress);
+});
+
+adminRoutes.get('/stores/stats', async (c) => {
+  const db = getDb(c.env);
+
+  const allStores = await db.select().from(stores);
+  const activeStores = allStores.filter((s) => s.active);
+  const inactiveStores = allStores.filter((s) => !s.active);
+
+  return successResponse(c, {
+    stats: {
+      totalStores: allStores.length,
+      activeStores: activeStores.length,
+      inactiveStores: inactiveStores.length,
+    },
+  });
 });
 
 adminRoutes.post('/seed-permissions', async (c) => {
@@ -105,4 +123,28 @@ adminRoutes.post('/setup', async (c) => {
   });
 
   return successResponse(c, { hasAdmins: true, adminCount: 1, becameSuperAdmin: true }, 'Super admin assigned successfully');
+});
+
+adminRoutes.get('/stores/pending', async (c) => {
+  const db = getDb(c.env);
+  const pendingStores = await db.query.stores.findMany({
+    where: eq(stores.active, false),
+    orderBy: desc(stores.createdAt),
+  });
+  return successResponse(c, pendingStores);
+});
+
+adminRoutes.post('/stores/:id/activate', async (c) => {
+  const auth = getAuth(c);
+  if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
+
+  const id = c.req.param('id');
+
+  try {
+    const store = await storesService.activateStore(c.env, id, auth.userId);
+    return successResponse(c, store, 'Store activated successfully');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to activate store';
+    return errorResponse(c, 400, 'ActivationError', message);
+  }
 });
