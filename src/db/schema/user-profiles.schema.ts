@@ -3,7 +3,7 @@ import { pgTable, text, timestamp, jsonb, boolean } from 'drizzle-orm/pg-core';
 export const userProfiles = pgTable('btracker_user_profiles', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().unique(),
-  isBanned: boolean('is_banned').default(false),
+  isBanned: boolean('is_banned'),
   bannedAt: timestamp('banned_at'),
   bannedBy: text('banned_by'),
   banReason: text('ban_reason'),

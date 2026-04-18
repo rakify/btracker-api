@@ -31,11 +31,17 @@ rolesRoutes.get('/', async (c) => {
   }
 
   const storeId = c.req.query('storeId');
-  
+  const withPermissions = c.req.query('withPermissions') === 'true';
+
   try {
     if (storeId) {
-      const roles = await rolesService.findByStore(c.env, storeId);
-      return successResponse(c, roles);
+      if (withPermissions) {
+        const roles = await rolesService.findByStoreWithPermissions(c.env, storeId);
+        return successResponse(c, roles);
+      } else {
+        const roles = await rolesService.findByStore(c.env, storeId);
+        return successResponse(c, roles);
+      }
     }
     const page = parseInt(c.req.query('page') || '1');
     const limit = parseInt(c.req.query('limit') || '20');
@@ -53,13 +59,22 @@ rolesRoutes.get('/:id', async (c) => {
   }
 
   const id = c.req.param('id');
-  const role = await rolesService.findById(c.env, id);
+  const storeId = c.req.query('storeId');
+  const withPermissions = c.req.query('withPermissions') === 'true';
 
-  if (!role) {
-    return errorResponse(c, 404, 'NotFound', 'Role not found');
+  if (withPermissions && storeId) {
+    const role = await rolesService.findByIdWithPermissions(c.env, id, storeId);
+    if (!role) {
+      return errorResponse(c, 404, 'NotFound', 'Role not found');
+    }
+    return successResponse(c, role);
+  } else {
+    const role = await rolesService.findById(c.env, id);
+    if (!role) {
+      return errorResponse(c, 404, 'NotFound', 'Role not found');
+    }
+    return successResponse(c, role);
   }
-
-  return successResponse(c, role);
 });
 
 rolesRoutes.patch('/:id', async (c) => {

@@ -26,4 +26,12 @@ export const rolesService = {
   async findByStore(env: Env, storeId: string) {
     return rolesRepository.findByStore(env, storeId);
   },
+
+  async findByStoreWithPermissions(env: Env, storeId: string) {
+    return rolesRepository.findByStoreWithPermissions(env, storeId);
+  },
+
+  async findByIdWithPermissions(env: Env, id: string, storeId: string) {
+    return rolesRepository.findByIdWithPermissions(env, id, storeId);
+  },
 };

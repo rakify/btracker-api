@@ -2,10 +2,10 @@ import { pgTable, timestamp, uuid, numeric } from 'drizzle-orm/pg-core';
 
 export const draftOrderProducts = pgTable('btracker_draft_order_products', {
   storeId: uuid('store_id').notNull(),
-  id: uuid('id').$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  id: uuid('id').primaryKey(),
   draftOrderId: uuid('draft_order_id').notNull(),
   productId: uuid('product_id').notNull(),
-  quantity: numeric('quantity', { precision: 10, scale: 2 }).notNull().default('0'),
+  quantity: numeric('quantity', { precision: 10, scale: 2 }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),

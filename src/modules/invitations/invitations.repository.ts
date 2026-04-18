@@ -10,6 +10,7 @@ export const invitationsRepository = {
     const now = new Date();
     const token = crypto.randomUUID();
     const [invitation] = await db.insert(storeInvitations).values({
+      id: crypto.randomUUID(),
       storeId: data.storeId,
       invitedEmail: data.invitedEmail,
       roleId: data.roleId,

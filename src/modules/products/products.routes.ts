@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
 import { getAuth } from '../../middlewares/auth.middleware.js';
+import { requirePermissions } from '../../middlewares/permissions.middleware.js';
 import { productsService } from './products.service.js';
 import { createProductSchema, updateProductSchema, productQuerySchema } from './products.validators.js';
 import { successResponse, errorResponse, paginatedResponse } from '../../lib/response.js';
 import type { Env } from '../../config/env.js';
 
-export const productsRoutes = new Hono<{ Bindings: Env }>();
+export const productsRoutes = new Hono<{ Bindings: Env; Variables: { permissions: string[] } }>();
 
 productsRoutes.get('/', async (c) => {
   const auth = getAuth(c);
@@ -13,12 +14,30 @@ productsRoutes.get('/', async (c) => {
     return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
   }
 
+  const storeId = c.req.query('storeId');
+  if (!storeId) {
+    return errorResponse(c, 400, 'ValidationError', 'storeId is required');
+  }
+
   try {
-    const query = productQuerySchema.parse(c.req.query());
+    const queryData = {
+      page: parseInt(c.req.query('page') || '1'),
+      limit: parseInt(c.req.query('limit') || '20'),
+      search: c.req.query('search'),
+      storeId,
+      name: c.req.query('name'),
+      price_range: c.req.query('price_range'),
+      acceptCommission: c.req.query('acceptCommission'),
+      isCustom: c.req.query('isCustom'),
+      sort: c.req.query('sort'),
+      status: (c.req.query('status') as 'active' | 'deleted' | 'all') || 'active',
+    };
+    const query = productQuerySchema.parse(queryData);
     const result = await productsService.findAll(c.env, query);
     return paginatedResponse(c, result.data, query.page, query.limit, result.total);
   } catch (error) {
-    return errorResponse(c, 500, 'ServerError', 'Failed to fetch products');
+    const message = error instanceof Error ? error.message : 'Failed to fetch products';
+    return errorResponse(c, 500, 'ServerError', message);
   }
 });
 
@@ -38,14 +57,20 @@ productsRoutes.get('/:id', async (c) => {
   return successResponse(c, product);
 });
 
-productsRoutes.post('/', async (c) => {
+productsRoutes.post('/', requirePermissions(['can_manage_products']), async (c) => {
   const auth = getAuth(c);
   if (!auth) {
     return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
   }
 
+  const storeId = c.req.query('storeId');
+  if (!storeId) {
+    return errorResponse(c, 400, 'ValidationError', 'storeId is required');
+  }
+
   try {
-    const data = createProductSchema.parse(await c.req.json());
+    const body = await c.req.json();
+    const data = createProductSchema.parse({ ...body, storeId });
     const product = await productsService.create(c.env, { ...data, createdBy: auth.userId });
     return successResponse(c, product, 'Product created successfully');
   } catch (error) {
@@ -54,7 +79,7 @@ productsRoutes.post('/', async (c) => {
   }
 });
 
-productsRoutes.patch('/:id', async (c) => {
+productsRoutes.patch('/:id', requirePermissions(['can_manage_products']), async (c) => {
   const auth = getAuth(c);
   if (!auth) {
     return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
@@ -72,7 +97,7 @@ productsRoutes.patch('/:id', async (c) => {
   }
 });
 
-productsRoutes.delete('/:id', async (c) => {
+productsRoutes.delete('/:id', requirePermissions(['can_manage_products']), async (c) => {
   const auth = getAuth(c);
   if (!auth) {
     return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');

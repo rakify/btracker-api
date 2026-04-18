@@ -1,12 +1,12 @@
 import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 export const roles = pgTable('btracker_roles', {
-  id: uuid('id').$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  id: uuid('id').primaryKey(),
   name: text('name').notNull(),
   description: text('description'),
   storeId: uuid('store_id'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdBy: text('created_by'),
   updatedBy: text('updated_by'),

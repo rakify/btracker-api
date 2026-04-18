@@ -1,13 +1,13 @@
 import { pgTable, text, timestamp, uuid, integer, boolean } from 'drizzle-orm/pg-core';
 
 export const expenseCategories = pgTable('btracker_expense_categories', {
-  id: uuid('id').$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  id: uuid('id').primaryKey(),
   storeId: uuid('store_id').notNull(),
   name: text('name').notNull(),
   normalizedName: text('normalized_name').notNull(),
   description: text('description'),
-  isActive: boolean('is_active').notNull().default(true),
-  sortOrder: integer('sort_order').notNull().default(0),
+  isActive: boolean('is_active').notNull(),
+  sortOrder: integer('sort_order').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),

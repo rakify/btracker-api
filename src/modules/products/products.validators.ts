@@ -28,10 +28,16 @@ export const updateProductSchema = z.object({
 });
 
 export const productQuerySchema = z.object({
-  page: z.number().default(1),
-  limit: z.number().default(20),
+  page: z.coerce.number().default(1),
+  limit: z.coerce.number().default(20),
   search: z.string().optional(),
-  storeId: z.string().uuid().optional(),
+  storeId: z.string().uuid(),
+  name: z.string().optional(),
+  price_range: z.string().optional(),
+  acceptCommission: z.string().optional(),
+  isCustom: z.string().optional(),
+  sort: z.string().optional(),
+  status: z.enum(['active', 'deleted', 'all']).default('active'),
 });
 
 export type CreateProductInput = z.infer<typeof createProductSchema>;

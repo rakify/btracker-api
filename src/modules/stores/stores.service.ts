@@ -17,6 +17,7 @@ export const storesService = {
     const db = getDb(env);
     const now = new Date();
     const [managerRole] = await db.insert(roles).values({
+      id: crypto.randomUUID(),
       name: 'Manager',
       storeId: store.id,
       createdBy: userId,

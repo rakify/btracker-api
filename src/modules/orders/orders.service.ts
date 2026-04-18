@@ -22,4 +22,8 @@ export const ordersService = {
   async findAll(env: Env, query: OrderQuery) {
     return ordersRepository.findAll(env, query);
   },
+
+  async getLatestEntryNo(env: Env, storeId: string) {
+    return ordersRepository.getLatestEntryNo(env, storeId);
+  },
 };

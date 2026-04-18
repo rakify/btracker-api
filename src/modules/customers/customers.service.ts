@@ -1,5 +1,5 @@
 import { customersRepository } from './customers.repository.js';
-import type { CreateCustomerInput, UpdateCustomerInput, CustomerQuery } from './customers.validators.js';
+import type { CreateCustomerInput, UpdateCustomerInput, CustomerQuery, CustomerOrdersQuery } from './customers.validators.js';
 import type { Env } from '../../config/env.js';
 
 export const customersService = {
@@ -21,5 +21,13 @@ export const customersService = {
 
   async findAll(env: Env, query: CustomerQuery) {
     return customersRepository.findAll(env, query);
+  },
+
+  async findByIdWithStatus(env: Env, id: string, storeId: string, status?: 'active' | 'deleted' | 'all') {
+    return customersRepository.findByIdWithStatus(env, id, storeId, status);
+  },
+
+  async findCustomerOrders(env: Env, query: CustomerOrdersQuery) {
+    return customersRepository.findCustomerOrders(env, query);
   },
 };

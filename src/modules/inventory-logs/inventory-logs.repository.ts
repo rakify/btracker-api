@@ -9,6 +9,7 @@ export const inventoryLogsRepository = {
     const db = getDb(env);
     const now = new Date();
     const [log] = await db.insert(inventoryLogs).values({
+      id: crypto.randomUUID(),
       storeId: data.storeId,
       type: data.type,
       productId: data.productId,

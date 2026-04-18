@@ -13,9 +13,14 @@ activityLogsRoutes.post('/', async (c) => {
     return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
   }
 
+  const storeId = c.req.query('storeId');
+  if (!storeId) {
+    return errorResponse(c, 400, 'ValidationError', 'storeId is required');
+  }
+
   try {
     const body = await c.req.json();
-    const data = createActivityLogSchema.parse(body);
+    const data = createActivityLogSchema.parse({ ...body, storeId });
     const log = await activityLogsService.create(c.env, data);
     return successResponse(c, log, 'Activity log created successfully');
   } catch (error) {

@@ -1,14 +1,14 @@
 import { pgTable, text, timestamp, uuid, numeric } from 'drizzle-orm/pg-core';
 
 export const masterWalletTransactions = pgTable('btracker_master_wallet_transactions', {
-  id: uuid('id').$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  id: uuid('id').primaryKey(),
   storeId: uuid('store_id').notNull(),
   masterWalletId: uuid('master_wallet_id').notNull(),
   type: text('type').notNull(),
   direction: text('direction').notNull(),
   amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
-  previousBalance: numeric('previous_balance', { precision: 12, scale: 2 }).notNull().default('0'),
-  newBalance: numeric('new_balance', { precision: 12, scale: 2 }).notNull().default('0'),
+  previousBalance: numeric('previous_balance', { precision: 12, scale: 2 }).notNull(),
+  newBalance: numeric('new_balance', { precision: 12, scale: 2 }).notNull(),
   expenseCategoryId: uuid('expense_category_id'),
   memberUserId: text('member_user_id'),
   customerId: uuid('customer_id'),

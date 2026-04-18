@@ -3,6 +3,7 @@ export interface Env {
   CLERK_SECRET_KEY: string;
   CLERK_PUBLISHABLE_KEY: string;
   NODE_ENV: string;
+  INITIAL_SUPER_ADMIN_EMAIL?: string;
 }
 
 export function getEnv(c: { env: Env }): Env {

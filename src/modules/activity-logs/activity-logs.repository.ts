@@ -9,6 +9,7 @@ export const activityLogsRepository = {
     const db = getDb(env);
     const now = new Date();
     const [log] = await db.insert(activityLogs).values({
+      id: crypto.randomUUID(),
       storeId: data.storeId,
       trackableType: data.trackableType,
       trackableId: data.trackableId,

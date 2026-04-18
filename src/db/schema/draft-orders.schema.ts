@@ -2,7 +2,7 @@ import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 export const draftOrders = pgTable('btracker_draft_orders', {
   storeId: uuid('store_id').notNull(),
-  id: uuid('id').$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  id: uuid('id').primaryKey(),
   customerId: uuid('customer_id').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),

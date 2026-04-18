@@ -1,26 +1,29 @@
 import { desc, eq, and, count } from 'drizzle-orm';
 import { getDb } from '../../db/client.js';
-import { stores } from '../../db/schema/index.js';
+import { stores, users } from '../../db/schema/index.js';
 import type { CreateStoreInput, UpdateStoreInput, StoreQuery } from './stores.validators.js';
 import type { Env } from '../../config/env.js';
 
 export const storesRepository = {
   async create(env: Env, data: CreateStoreInput, userId: string) {
     const db = getDb(env);
-    const now = new Date();
     const slug = data.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     
-    const [store] = await db.insert(stores).values({
+    // Insert with all values
+    const result = await db.insert(stores).values({
+      id: crypto.randomUUID(),
+      userId: userId,
       name: data.name,
-      description: data.description,
-      userId,
-      slug,
-      createdBy: userId,
+      description: data.description || null,
+      slug: slug,
+      currencySymbol: '৳',
       active: false,
-      createdAt: now,
-      updatedAt: now,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      createdBy: userId,
     }).returning();
-    return store;
+    
+    return result[0];
   },
 
   async findById(env: Env, id: string) {

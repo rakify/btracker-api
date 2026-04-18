@@ -34,7 +34,7 @@ storesRoutes.get('/', async (c) => {
     const stores = await storesService.findByUser(c.env, auth.userId);
     return successResponse(c, stores);
   } catch (error) {
-    return errorResponse(c, 500, 'ServerError', 'Failed to fetch stores');
+    return errorResponse(c, 500, 'ServerError', 'Failed to fetch stores: ' + String(error));
   }
 });
 

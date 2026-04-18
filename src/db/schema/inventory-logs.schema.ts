@@ -2,8 +2,8 @@ import { pgTable, text, timestamp, uuid, numeric } from 'drizzle-orm/pg-core';
 
 export const inventoryLogs = pgTable('btracker_inventory_logs', {
   storeId: uuid('store_id').notNull(),
-  id: uuid('id').$defaultFn(() => crypto.randomUUID()).primaryKey(),
-  type: text('type').notNull().default('order'),
+  id: uuid('id').primaryKey(),
+  type: text('type').notNull(),
   productId: uuid('product_id').notNull(),
   orderId: uuid('order_id'),
   customerId: uuid('customer_id'),

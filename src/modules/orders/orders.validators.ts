@@ -1,17 +1,33 @@
 import { z } from 'zod';
 
+const numericSchema = z.number().or(z.string()).default(0);
+
 export const createOrderSchema = z.object({
   storeId: z.string().uuid(),
   customerId: z.string().uuid(),
-  products: z.array(z.object({
-    productId: z.string().uuid().optional(),
-    name: z.string(),
-    price: z.number().or(z.string()),
-    quantity: z.number().or(z.string()),
-    returnedQuantity: z.number().or(z.string()).default(0),
-    acceptCommission: z.boolean().default(false),
-    allowPreOrder: z.boolean().default(false),
-  })),
+  entryNo: z.number().or(z.string()).optional(),
+  primaryCost: numericSchema,
+  totalCostWithCommission: numericSchema,
+  totalCostWithoutCommission: numericSchema,
+  costAfterCommission: numericSchema,
+  commissionPercentage: numericSchema,
+  commissionValue: numericSchema,
+  previousReserve: numericSchema,
+  currentReserve: numericSchema,
+  finalReserve: numericSchema,
+  products: z.record(
+    z.string().uuid(),
+    z.object({
+      productId: z.string().uuid().optional(),
+      name: z.string(),
+      price: numericSchema,
+      quantity: numericSchema,
+      returnedQuantity: numericSchema,
+      acceptCommission: z.boolean().default(false),
+      allowPreOrder: z.boolean().default(false),
+      inventory: numericSchema.optional(),
+    })
+  ),
   createdBy: z.string().optional(),
 });
 
@@ -27,6 +43,10 @@ export const orderQuerySchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
   sort: z.string().optional(),
+});
+
+export const latestEntryNoQuerySchema = z.object({
+  storeId: z.string().uuid(),
 });
 
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;

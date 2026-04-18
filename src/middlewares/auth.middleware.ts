@@ -1,14 +1,18 @@
 import type { Context, Next } from 'hono';
-import { createClerkClient, verifyToken } from '@clerk/backend';
+import { getDb } from '../db/client.js';
+import { users } from '../db/schema/index.js';
+import { eq } from 'drizzle-orm';
 
 export interface AuthBindings {
   CLERK_SECRET_KEY: string;
   CLERK_PUBLISHABLE_KEY: string;
+  DATABASE_URL: string;
 }
 
 export interface AuthContext {
   userId: string;
-  email: string;
+  clerkUserId: string;
+  email?: string;
 }
 
 declare module 'hono' {
@@ -16,6 +20,9 @@ declare module 'hono' {
     auth: AuthContext;
   }
 }
+
+const userCache = new Map<string, { clerkUserId: string; internalId: string; email: string; expires: number }>();
+const CACHE_TTL = 3600 * 1000;
 
 export async function authMiddleware(c: Context<{ Bindings: AuthBindings }>, next: Next) {
   const authHeader = c.req.header('authorization') || c.req.header('Authorization');
@@ -26,31 +33,50 @@ export async function authMiddleware(c: Context<{ Bindings: AuthBindings }>, nex
   }
 
   try {
-    const { data: sessionToken, errors } = await verifyToken(token, {
-      secretKey: c.env.CLERK_SECRET_KEY,
-    });
-
-    if (errors || !sessionToken) {
-      throw new Error('Invalid token');
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return c.json({ success: false, error: 'Unauthorized', message: 'Invalid token format' }, 401);
     }
 
-    const payload = sessionToken as { sub: string };
-    
-    const clerk = createClerkClient({
-      secretKey: c.env.CLERK_SECRET_KEY,
-      publishableKey: c.env.CLERK_PUBLISHABLE_KEY,
-    });
+    const payload = JSON.parse(atob(parts[1]));
+    const clerkUserId = payload.sub;
 
-    const user = await clerk.users.getUser(payload.sub);
+    if (!clerkUserId) {
+      return c.json({ success: false, error: 'Unauthorized', message: 'Invalid token - no sub claim' }, 401);
+    }
 
-    c.set('auth', {
-      userId: payload.sub,
-      email: user.emailAddresses[0]?.emailAddress || '',
-    });
+    const now = Date.now();
+    const cached = userCache.get(clerkUserId);
+    if (cached && cached.expires > now) {
+      c.set('auth', { userId: cached.internalId, clerkUserId: cached.clerkUserId, email: cached.email });
+      await next();
+      return;
+    }
+
+    const db = getDb(c.env);
+    const existingUser = await db.query.users.findFirst({ where: eq(users.clerkUserId, clerkUserId) });
+
+    if (existingUser) {
+      const userData = { clerkUserId, internalId: existingUser.id, email: existingUser.email || '', expires: now + CACHE_TTL };
+      userCache.set(clerkUserId, userData);
+      c.set('auth', { userId: existingUser.id, clerkUserId, email: existingUser.email || '' });
+    } else {
+      const [newUser] = await db.insert(users).values({
+        id: crypto.randomUUID(),
+        clerkUserId,
+        name: payload.name || 'User',
+        email: null,
+        emailVerified: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }).returning();
+      const userData = { clerkUserId, internalId: newUser.id, email: '', expires: now + CACHE_TTL };
+      userCache.set(clerkUserId, userData);
+      c.set('auth', { userId: newUser.id, clerkUserId, email: '' });
+    }
 
     await next();
   } catch (error) {
-    console.error('Auth error:', error);
     return c.json({ success: false, error: 'Unauthorized', message: 'Invalid token' }, 401);
   }
 }

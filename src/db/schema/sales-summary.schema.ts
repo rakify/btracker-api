@@ -2,7 +2,7 @@ import { pgTable, text, timestamp, uuid, date, numeric } from 'drizzle-orm/pg-co
 
 export const salesSummary = pgTable('btracker_sales_summary', {
   storeId: uuid('store_id').notNull(),
-  id: uuid('id').$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  id: uuid('id').primaryKey(),
   summaryType: text('summary_type').notNull(),
   dateStart: date('date_start').notNull(),
   dateEnd: date('date_end').notNull(),

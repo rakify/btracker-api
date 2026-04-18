@@ -13,9 +13,14 @@ invitationsRoutes.post('/', async (c) => {
     return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
   }
 
+  const storeId = c.req.query('storeId');
+  if (!storeId) {
+    return errorResponse(c, 400, 'ValidationError', 'storeId is required');
+  }
+
   try {
     const body = await c.req.json();
-    const data = createInvitationSchema.parse(body);
+    const data = createInvitationSchema.parse({ ...body, storeId });
     const invitation = await invitationsService.create(c.env, { ...data, createdBy: auth.userId });
     return successResponse(c, invitation, 'Invitation created successfully');
   } catch (error) {

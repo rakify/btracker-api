@@ -1,6 +1,6 @@
 import { desc, eq, and, count, gte, lte } from 'drizzle-orm';
 import { getDb } from '../../db/client.js';
-import { orders, orderProducts } from '../../db/schema/index.js';
+import { orders, orderProducts, customers } from '../../db/schema/index.js';
 import type { CreateOrderInput, UpdateOrderInput, OrderQuery } from './orders.validators.js';
 import type { Env } from '../../config/env.js';
 
@@ -10,33 +10,31 @@ export const ordersRepository = {
     const now = new Date();
 
     const [order] = await db.insert(orders).values({
+      id: crypto.randomUUID(),
       storeId: data.storeId,
       customerId: data.customerId,
-      entryNo: Math.floor(Math.random() * 100000),
-      primaryCost: '0',
-      totalCostWithCommission: '0',
-      totalCostWithoutCommission: '0',
-      costAfterCommission: '0',
-      commissionPercentage: '0',
-      commissionValue: '0',
-      previousReserve: '0',
-      currentReserve: '0',
-      finalReserve: '0',
+      entryNo: typeof data.entryNo === 'string' ? parseInt(data.entryNo) : (data.entryNo || Math.floor(Math.random() * 100000)),
+      primaryCost: String(data.primaryCost),
+      totalCostWithCommission: String(data.totalCostWithCommission),
+      totalCostWithoutCommission: String(data.totalCostWithoutCommission),
+      costAfterCommission: String(data.costAfterCommission),
+      commissionPercentage: String(data.commissionPercentage),
+      commissionValue: String(data.commissionValue),
+      previousReserve: String(data.previousReserve),
+      currentReserve: String(data.currentReserve),
+      finalReserve: String(data.finalReserve),
       createdBy: data.createdBy,
       createdAt: now,
       updatedAt: now,
     }).returning();
 
-    let totalCost = 0;
-    for (const product of data.products) {
-      const qty = typeof product.quantity === 'string' ? parseFloat(product.quantity) : product.quantity;
-      const prc = typeof product.price === 'string' ? parseFloat(product.price) : product.price;
-      totalCost += qty * prc;
-
+    const productEntries = Object.entries(data.products);
+    for (const [productId, product] of productEntries) {
       await db.insert(orderProducts).values({
+        id: crypto.randomUUID(),
         storeId: data.storeId,
         orderId: order.id,
-        productId: product.productId || null,
+        productId: product.productId || productId || null,
         name: product.name,
         price: String(product.price),
         quantity: String(product.quantity),
@@ -49,18 +47,7 @@ export const ordersRepository = {
       });
     }
 
-    const [updatedOrder] = await db.update(orders)
-      .set({ 
-        primaryCost: String(totalCost),
-        totalCostWithCommission: String(totalCost),
-        totalCostWithoutCommission: String(totalCost),
-        costAfterCommission: String(totalCost),
-        updatedAt: now,
-      })
-      .where(eq(orders.id, order.id))
-      .returning();
-
-    return { ...order, ...updatedOrder };
+    return order;
   },
 
   async findById(env: Env, id: string) {
@@ -101,7 +88,7 @@ export const ordersRepository = {
     if (from) where.push(gte(orders.createdAt, new Date(from)));
     if (to) where.push(lte(orders.createdAt, new Date(to)));
 
-    const [data, totalResult] = await Promise.all([
+    const [ordersData, totalResult] = await Promise.all([
       db.select().from(orders)
         .where(and(...where))
         .orderBy(desc(orders.createdAt))
@@ -110,9 +97,54 @@ export const ordersRepository = {
       db.select({ count: count() }).from(orders).where(and(...where)),
     ]);
 
+    // Fetch related data for all orders in parallel
+    const ordersWithRelations = await Promise.all(
+      ordersData.map(async (order) => {
+        const [orderItems, customer] = await Promise.all([
+          db.select().from(orderProducts).where(eq(orderProducts.orderId, order.id)),
+          db.select().from(customers).where(eq(customers.id, order.customerId)).limit(1),
+        ]);
+
+        return {
+          ...order,
+          customer: customer[0] ? { id: customer[0].id, name: customer[0].name } : { id: order.customerId, name: 'Unknown' },
+          createdBy: { id: order.createdBy || '', email: null },
+          products: orderItems.map(item => ({
+            productId: item.productId,
+            name: item.name,
+            quantity: item.quantity,
+            returnedQuantity: item.returnedQuantity,
+            price: item.price,
+            acceptCommission: item.acceptCommission,
+            allowPreOrder: item.allowPreOrder,
+          })),
+        };
+      })
+    );
+
     return {
-      data,
+      data: ordersWithRelations,
       total: totalResult[0]?.count || 0,
     };
+  },
+
+  async getLatestEntryNo(env: Env, storeId: string): Promise<number> {
+    try {
+      const db = getDb(env);
+      const result = await db
+        .select({ entryNo: orders.entryNo })
+        .from(orders)
+        .where(eq(orders.storeId, storeId))
+        .orderBy(desc(orders.entryNo))
+        .limit(1);
+
+      if (!result || result.length === 0) {
+        return 0;
+      }
+      return result[0].entryNo ?? 0;
+    } catch (error) {
+      console.error('Error getting latest entry no:', error);
+      return 0;
+    }
   },
 };

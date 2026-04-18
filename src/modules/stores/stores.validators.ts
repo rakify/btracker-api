@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const createStoreSchema = z.object({
   name: z.string().min(1, 'Store name is required'),
   description: z.string().optional(),
+  currencySymbol: z.string().optional().default('৳'),
 });
 
 export const updateStoreSchema = z.object({

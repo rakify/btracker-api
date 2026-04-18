@@ -35,12 +35,9 @@ export function paginatedResponse<T>(
 ) {
   return c.json({
     success: true,
-    data,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
+    data: {
+      data,
+      pageCount: Math.ceil(total / limit),
     },
   });
 }

@@ -1,7 +1,7 @@
 import { pgTable, timestamp, uuid, integer } from 'drizzle-orm/pg-core';
 
 export const storeOrderCounters = pgTable('btracker_store_order_counters', {
-  id: uuid('id').$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  id: uuid('id').primaryKey(),
   latestEntryNo: integer('latest_entry_no').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),

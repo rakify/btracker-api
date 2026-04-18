@@ -1,13 +1,14 @@
-import { pgTable, text, timestamp, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, uuid } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('btracker_users', {
-  id: text('id').primaryKey(),
+  id: uuid('id').primaryKey(),
+  clerkUserId: text('clerk_user_id').notNull().unique(),
   name: text('name'),
   email: text('email').unique(),
-  emailVerified: boolean('email_verified').default(false),
+  emailVerified: boolean('email_verified').notNull(),
   image: text('image'),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
+  createdAt: timestamp('created_at'),
+  updatedAt: timestamp('updated_at'),
 });
 
 export type User = typeof users.$inferSelect;

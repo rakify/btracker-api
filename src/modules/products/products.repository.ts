@@ -1,28 +1,36 @@
-import { desc, eq, like, and, count } from 'drizzle-orm';
+import { desc, eq, like, and, count, asc, gte, lte, isNotNull, isNull, ilike } from 'drizzle-orm';
 import { getDb } from '../../db/client.js';
 import { products } from '../../db/schema/index.js';
-import type { CreateProductInput, UpdateProductInput, ProductQuery } from './products.validators.js';
+import type {
+  CreateProductInput,
+  UpdateProductInput,
+  ProductQuery,
+} from './products.validators.js';
 import type { Env } from '../../config/env.js';
 
 export const productsRepository = {
   async create(env: Env, data: CreateProductInput) {
     const db = getDb(env);
     const now = new Date();
-    const [product] = await db.insert(products).values({
-      storeId: data.storeId,
-      name: data.name,
-      description: data.description,
-      images: data.images,
-      price: String(data.price),
-      allowPreOrder: data.allowPreOrder,
-      acceptCommission: data.acceptCommission,
-      isCustom: data.isCustom,
-      inventory: data.inventory,
-      tags: data.tags,
-      createdAt: now,
-      updatedAt: now,
-      createdBy: data.createdBy,
-    }).returning();
+    const [product] = await db
+      .insert(products)
+      .values({
+        id: crypto.randomUUID(),
+        storeId: data.storeId,
+        name: data.name,
+        description: data.description,
+        images: data.images,
+        price: String(data.price),
+        allowPreOrder: data.allowPreOrder,
+        acceptCommission: data.acceptCommission,
+        isCustom: data.isCustom,
+        inventory: data.inventory,
+        tags: data.tags,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: data.createdBy,
+      })
+      .returning();
     return product;
   },
 
@@ -46,8 +54,9 @@ export const productsRepository = {
     if (data.inventory !== undefined) updateData.inventory = data.inventory;
     if (data.tags !== undefined) updateData.tags = data.tags;
     if (data.updatedBy !== undefined) updateData.updatedBy = data.updatedBy;
-    
-    const [product] = await db.update(products)
+
+    const [product] = await db
+      .update(products)
       .set(updateData)
       .where(eq(products.id, id))
       .returning();
@@ -56,36 +65,94 @@ export const productsRepository = {
 
   async delete(env: Env, id: string) {
     const db = getDb(env);
-    await db.update(products)
-      .set({ deletedAt: new Date() })
-      .where(eq(products.id, id));
+    await db.update(products).set({ deletedAt: new Date() }).where(eq(products.id, id));
   },
 
   async findAll(env: Env, query: ProductQuery) {
     const db = getDb(env);
-    const { page, limit, search, storeId } = query;
+    const {
+      page,
+      limit,
+      search,
+      storeId,
+      name,
+      price_range,
+      acceptCommission,
+      isCustom,
+      sort,
+      status,
+    } = query;
     const offset = (page - 1) * limit;
 
-    const where = [];
-    if (search) {
-      where.push(like(products.name, `%${search}%`));
-    }
-    if (storeId) {
-      where.push(eq(products.storeId, storeId));
-    }
+    const [column, order] = (sort?.split('.') as [
+      keyof typeof products.$inferSelect | undefined,
+      'asc' | 'desc' | undefined,
+    ]) ?? ['createdAt', 'desc'];
+
+    const [minPrice, maxPrice] = price_range?.split('-') ?? [];
+    const acceptCommissionBool =
+      acceptCommission !== undefined ? acceptCommission === 'true' : undefined;
+    const isCustomBool = isCustom !== undefined ? isCustom === 'true' : undefined;
+
+    const sortableColumns: Record<string, any> = {
+      name: products.name,
+      price: products.price,
+      inventory: products.inventory,
+      createdAt: products.createdAt,
+    };
+
+    const safeColumn =
+      column && sortableColumns[column] ? sortableColumns[column] : products.createdAt;
+
+    const whereConditions = [
+      storeId ? eq(products.storeId, storeId) : undefined,
+      name ? ilike(products.name, `%${name}%`) : undefined,
+      minPrice ? gte(products.price, minPrice) : undefined,
+      maxPrice ? lte(products.price, maxPrice) : undefined,
+      acceptCommissionBool !== undefined
+        ? eq(products.acceptCommission, acceptCommissionBool)
+        : undefined,
+      isCustomBool !== undefined ? eq(products.isCustom, isCustomBool) : undefined,
+      status === 'deleted'
+        ? isNotNull(products.deletedAt)
+        : status === 'active'
+          ? isNull(products.deletedAt)
+          : undefined,
+    ].filter(Boolean);
+
+    const whereClause =
+      whereConditions.length > 0 ? and(...whereConditions) : eq(products.storeId, storeId);
 
     const [data, totalResult] = await Promise.all([
-      db.select().from(products)
-        .where(and(...where))
-        .orderBy(desc(products.createdAt))
+      db
+        .select({
+          id: products.id,
+          name: products.name,
+          description: products.description,
+          price: products.price,
+          inventory: products.inventory,
+          acceptCommission: products.acceptCommission,
+          allowPreOrder: products.allowPreOrder,
+          createdAt: products.createdAt,
+          deletedAt: products.deletedAt,
+          createdBy: products.createdBy,
+          deletedBy: products.deletedBy,
+        })
+        .from(products)
+        .where(whereClause)
+        .orderBy(order === 'asc' ? asc(safeColumn) : desc(safeColumn))
         .limit(limit)
         .offset(offset),
-      db.select({ count: count() }).from(products).where(and(...where)),
+      db
+        .select({ count: count(products.id) })
+        .from(products)
+        .where(whereClause)
+        .then(res => res[0]?.count ?? 0),
     ]);
 
     return {
       data,
-      total: totalResult[0]?.count || 0,
+      total: totalResult,
     };
   },
 };

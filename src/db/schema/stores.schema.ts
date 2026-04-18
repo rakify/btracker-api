@@ -1,16 +1,16 @@
-import { pgTable, text, timestamp, uuid, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, uuid } from 'drizzle-orm/pg-core';
 
 export const stores = pgTable('btracker_stores', {
-  id: uuid('id').$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  id: uuid('id').primaryKey(),
   userId: text('user_id').notNull(),
   name: text('name').notNull(),
   description: text('description'),
   slug: text('slug').notNull().unique(),
-  currencySymbol: text('currency_symbol').notNull().default('৳'),
-  active: boolean('active').notNull().default(false),
+  currencySymbol: text('currency_symbol').notNull(),
+  active: boolean('active').notNull(),
   activeSince: timestamp('active_since', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdBy: text('created_by'),
   updatedBy: text('updated_by'),

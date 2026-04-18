@@ -5,6 +5,7 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 NODE_ENV = "production"
+INITIAL_SUPER_ADMIN_EMAIL = "irakibm@gmail.com"
 
 [env.production]
-vars = { NODE_ENV = "production" }
+vars = { NODE_ENV = "production", INITIAL_SUPER_ADMIN_EMAIL = "irakibm@gmail.com" }
