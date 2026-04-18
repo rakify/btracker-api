@@ -1,150 +1,95 @@
 import { Hono } from 'hono';
+import { getDb } from '../../db/client.js';
+import { permissions } from '../../db/schema/index.js';
+import { stores } from '../../db/schema/stores.schema.js';
+import { roles } from '../../db/schema/roles.schema.js';
+import { adminRoles } from '../../db/schema/admin-roles.schema.js';
 import { getAuth } from '../../middlewares/auth.middleware.js';
 import { adminService } from './admin.service.js';
-import { storeActionSchema } from './admin.validators.js';
-import { successResponse, errorResponse } from '../../lib/response.js';
+import { errorResponse, successResponse } from '../../lib/response.js';
 import type { Env } from '../../config/env.js';
 
 export const adminRoutes = new Hono<{ Bindings: Env }>();
 
-// Check if user is super admin
-adminRoutes.get('/is-super-admin', async c => {
-  const auth = getAuth(c);
-  if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
+interface SetupProgress {
+  permissionsSeeded: boolean;
+  permissionsCount: number;
+  storesExist: boolean;
+  storesCount: number;
+  defaultRolesCreated: boolean;
+  hasSuperAdmin: boolean;
+  superAdminCount: number;
+  allComplete: boolean;
+}
 
-  const isSuperAdmin = await adminService.isSuperAdmin(c.env, auth.userId);
-  return successResponse(c, { isSuperAdmin });
+adminRoutes.get('/setup-progress', async (c) => {
+  const db = getDb(c.env);
+
+  const permissionsList = await db.select().from(permissions);
+  const storesList = await db.select().from(stores);
+  const rolesList = await db.select().from(roles);
+  const admins = await db.select().from(adminRoles);
+
+  const progress: SetupProgress = {
+    permissionsSeeded: permissionsList.length > 0,
+    permissionsCount: permissionsList.length,
+    storesExist: storesList.length > 0,
+    storesCount: storesList.length,
+    defaultRolesCreated: rolesList.length > 0,
+    hasSuperAdmin: admins.length > 0,
+    superAdminCount: admins.length,
+    allComplete: permissionsList.length > 0 && storesList.length > 0 && rolesList.length > 0 && admins.length > 0,
+  };
+
+  return successResponse(c, progress);
 });
 
-// Get user admin role
-adminRoutes.get('/role', async c => {
-  const auth = getAuth(c);
-  if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
+adminRoutes.post('/seed-permissions', async (c) => {
+  const db = getDb(c.env);
 
-  const role = await adminService.getUserAdminRole(c.env, auth.userId);
-  return successResponse(c, { role });
+  const allPermissions = [
+    { name: 'can_view_orders', description: 'View orders', group: 'Orders' },
+    { name: 'can_manage_orders', description: 'Manage orders', group: 'Orders' },
+    { name: 'can_view_products', description: 'View products', group: 'Products' },
+    { name: 'can_manage_products', description: 'Manage products', group: 'Products' },
+    { name: 'can_add_custom_products', description: 'Add custom products', group: 'Products' },
+    { name: 'can_view_customers', description: 'View customers', group: 'Customers' },
+    { name: 'can_manage_customers', description: 'Manage customers', group: 'Customers' },
+    { name: 'can_view_roles', description: 'View roles', group: 'Roles' },
+    { name: 'can_manage_roles', description: 'Manage roles', group: 'Roles' },
+    { name: 'can_view_members', description: 'View members', group: 'Members' },
+    { name: 'can_manage_members', description: 'Manage members', group: 'Members' },
+    { name: 'can_view_invitations', description: 'View invitations', group: 'Invitations' },
+    { name: 'can_manage_invitations', description: 'Manage invitations', group: 'Invitations' },
+    { name: 'can_view_master_wallet', description: 'View master wallet', group: 'Wallets' },
+    { name: 'can_manage_master_wallet', description: 'Manage master wallet', group: 'Wallets' },
+    { name: 'can_view_member_wallets', description: 'View member wallets', group: 'Wallets' },
+    { name: 'can_manage_member_wallets', description: 'Manage member wallets', group: 'Wallets' },
+    { name: 'can_manage_expense_categories', description: 'Manage expense categories', group: 'Wallets' },
+    { name: 'can_view_own_wallet', description: 'View own wallet', group: 'Wallets' },
+    { name: 'can_view_activity_logs', description: 'View activity logs', group: 'Logs' },
+    { name: 'can_view_inventory_logs', description: 'View inventory logs', group: 'Logs' },
+    { name: 'can_view_stores', description: 'View stores', group: 'Stores' },
+    { name: 'can_manage_stores', description: 'Manage stores', group: 'Stores' },
+  ];
+
+  let insertedCount = 0;
+  for (const perm of allPermissions) {
+    try {
+      await db.insert(permissions).values({
+        id: crypto.randomUUID(),
+        ...perm,
+      }).onConflictDoNothing();
+      insertedCount++;
+    } catch {
+      // Skip duplicates
+    }
+  }
+
+  return successResponse(c, { inserted: insertedCount, total: allPermissions.length });
 });
 
-// Check if user has specific permission
-adminRoutes.get('/permission/:permission', async c => {
-  const auth = getAuth(c);
-  if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
-
-  const permission = c.req.param('permission');
-  const hasPermission = await adminService.hasAdminPermission(c.env, auth.userId, permission);
-  return successResponse(c, { hasPermission });
-});
-
-// Check if user is admin
-adminRoutes.get('/is-admin', async c => {
-  const auth = getAuth(c);
-  if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
-
-  const isAdmin = await adminService.isAdmin(c.env, auth.userId);
-  return successResponse(c, { isAdmin });
-});
-
-// Check if user is banned
-adminRoutes.get('/is-banned/:userId', async c => {
-  const auth = getAuth(c);
-  if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
-
-  const isAdmin = await adminService.isAdmin(c.env, auth.userId);
-  if (!isAdmin) return errorResponse(c, 403, 'Forbidden', 'Only admins can check ban status');
-
-  const userId = c.req.param('userId');
-  const isBanned = await adminService.isBanned(c.env, userId);
-  return successResponse(c, { isBanned });
-});
-
-// Get all admins
-adminRoutes.get('/admins', async c => {
-  const auth = getAuth(c);
-  if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
-
-  const isAdmin = await adminService.isAdmin(c.env, auth.userId);
-  if (!isAdmin) return errorResponse(c, 403, 'Forbidden', 'Only admins can view admin list');
-
-  const admins = await adminService.getAllAdmins(c.env);
-  return successResponse(c, { admins });
-});
-
-// Get all users
-adminRoutes.get('/users', async c => {
-  const auth = getAuth(c);
-  if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
-
-  const isAdmin = await adminService.isAdmin(c.env, auth.userId);
-  if (!isAdmin) return errorResponse(c, 403, 'Forbidden', 'Only admins can view users');
-
-  const users = await adminService.getAllUsers(c.env);
-  return successResponse(c, { users });
-});
-
-// Get all stores for admin
-adminRoutes.get('/stores', async c => {
-  const auth = getAuth(c);
-  if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
-
-  const isAdmin = await adminService.isAdmin(c.env, auth.userId);
-  if (!isAdmin) return errorResponse(c, 403, 'Forbidden', 'Only admins can view stores');
-
-  const stores = await adminService.getAllStoresForAdmin(c.env);
-  return successResponse(c, { stores });
-});
-
-// Activate store
-adminRoutes.post('/stores/activate', async c => {
-  const auth = getAuth(c);
-  if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
-
-  const body = await c.req.json();
-  const data = storeActionSchema.parse(body);
-  const success = await adminService.activateStore(c.env, data, auth.userId);
-  return successResponse(c, { success }, 'Store activated successfully');
-});
-
-// Deactivate store
-adminRoutes.post('/stores/deactivate', async c => {
-  const auth = getAuth(c);
-  if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
-
-  const body = await c.req.json();
-  const data = storeActionSchema.parse(body);
-  const success = await adminService.deactivateStore(c.env, data, auth.userId);
-  return successResponse(c, { success }, 'Store deactivated successfully');
-});
-
-// Get store stats
-adminRoutes.get('/stores/stats', async c => {
-  const auth = getAuth(c);
-  if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
-
-  const isAdmin = await adminService.isAdmin(c.env, auth.userId);
-  if (!isAdmin) return errorResponse(c, 403, 'Forbidden', 'Only admins can view store stats');
-
-  const stats = await adminService.getStoreStats(c.env);
-  return successResponse(c, { stats });
-});
-
-// Get setup status - GET
-adminRoutes.get('/setup', async c => {
-  const auth = getAuth(c);
-  if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
-
-  const existingAdmins = await adminService.getAllAdmins(c.env);
-  const hasAdmins = existingAdmins.length > 0;
-
-  return successResponse(c, {
-    hasAdmins,
-    adminCount: existingAdmins.length,
-    initialAdminEmail: c.env.INITIAL_SUPER_ADMIN_EMAIL,
-    setupRequired: !hasAdmins,
-  });
-});
-
-// Create super admin - POST
-adminRoutes.post('/setup', async c => {
+adminRoutes.post('/setup', async (c) => {
   const auth = getAuth(c);
   if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
 
