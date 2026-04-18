@@ -9,7 +9,7 @@ export const CORS_ORIGINS = [
   'http://localhost:8081',
   'https://btracker-mobile.vercel.app',
   'exp://*',
-  'https://grzmocradle.com',
+  'https://grizmocradle.com',
 ];
 
 export const STOCK_MOVEMENT_TYPES = {
