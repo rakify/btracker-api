@@ -5,7 +5,6 @@ import { eq } from 'drizzle-orm';
 
 export interface AuthBindings {
   CLERK_SECRET_KEY: string;
-  CLERK_PUBLISHABLE_KEY: string;
   DATABASE_URL: string;
 }
 
