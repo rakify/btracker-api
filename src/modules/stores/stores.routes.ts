@@ -17,7 +17,7 @@ storesRoutes.post('/', async (c) => {
     const body = await c.req.json();
     const data = createStoreSchema.parse(body);
     const store = await storesService.create(c.env, data, auth.userId);
-    return successResponse(c, store, 'Store created successfully');
+    return successResponse(c, store, 'Store created successfully. Pending activation by admin.');
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to create store';
     return errorResponse(c, 400, 'ValidationError', message);
@@ -35,6 +35,20 @@ storesRoutes.get('/', async (c) => {
     return successResponse(c, stores);
   } catch (error) {
     return errorResponse(c, 500, 'ServerError', 'Failed to fetch stores: ' + String(error));
+  }
+});
+
+storesRoutes.get('/pending', async (c) => {
+  const auth = getAuth(c);
+  if (!auth) {
+    return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
+  }
+
+  try {
+    const pendingStores = await storesService.findPending(c.env);
+    return successResponse(c, pendingStores);
+  } catch (error) {
+    return errorResponse(c, 500, 'ServerError', 'Failed to fetch pending stores: ' + String(error));
   }
 });
 
@@ -61,7 +75,7 @@ storesRoutes.patch('/:id', async (c) => {
   }
 
   const id = c.req.param('id');
-  
+
   try {
     const body = await c.req.json();
     const data = updateStoreSchema.parse(body);
@@ -70,6 +84,23 @@ storesRoutes.patch('/:id', async (c) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to update store';
     return errorResponse(c, 400, 'ValidationError', message);
+  }
+});
+
+storesRoutes.post('/:id/activate', async (c) => {
+  const auth = getAuth(c);
+  if (!auth) {
+    return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
+  }
+
+  const id = c.req.param('id');
+
+  try {
+    const store = await storesService.activateStore(c.env, id, auth.userId);
+    return successResponse(c, store, 'Store activated successfully. Default roles created.');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to activate store';
+    return errorResponse(c, 400, 'ActivationError', message);
   }
 });
 

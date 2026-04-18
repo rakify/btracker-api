@@ -88,4 +88,12 @@ export const storesRepository = {
       orderBy: desc(stores.createdAt),
     });
   },
+
+  async findPending(env: Env) {
+    const db = getDb(env);
+    return db.query.stores.findMany({
+      where: eq(stores.active, false),
+      orderBy: desc(stores.createdAt),
+    });
+  },
 };
