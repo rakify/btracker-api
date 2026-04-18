@@ -1,10 +1,10 @@
 import { pgTable, text, timestamp, boolean, uuid, jsonb } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('btracker_users', {
-  id: uuid('id').primaryKey(),
+  id: uuid('id').primaryKey().defaultRandom(),
   clerkUserId: text('clerk_user_id').notNull().unique(),
   name: text('name'),
-  email: text('email').unique(),
+  email: text('email'),
   emailVerified: boolean('email_verified').notNull(),
   avatarUrl: text('avatar_url'),
   username: text('username'),

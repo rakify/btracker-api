@@ -4,6 +4,7 @@ import { users } from '../../db/schema/index.js';
 import { eq } from 'drizzle-orm';
 import type { Env } from '../../config/env.js';
 import { errorResponse, successResponse } from '../../lib/response.js';
+import { Webhook } from 'svix';
 
 export const webhooksRoutes = new Hono<{ Bindings: Env }>();
 
@@ -41,19 +42,24 @@ webhooksRoutes.post('/clerk', async (c) => {
   }
 
   const body = await c.req.text();
-  const headerSignature = c.req.header('clerk-signature');
+  const svixId = c.req.header('svix-id');
+  const svixTimestamp = c.req.header('svix-timestamp');
+  const svixSignature = c.req.header('svix-signature');
 
-  if (!headerSignature) {
-    return errorResponse(c, 401, 'Unauthorized', 'Missing clerk-signature header');
+  if (!svixSignature) {
+    return errorResponse(c, 401, 'Unauthorized', 'Missing svix-signature header');
   }
 
   try {
-    const verified = await verifyClerkWebhook(body, headerSignature, webhookSecret);
-    if (!verified) {
-      return errorResponse(c, 401, 'Unauthorized', 'Invalid webhook signature');
-    }
+    const wh = new Webhook(webhookSecret);
+    wh.verify(body, {
+      'svix-id': svixId || '',
+      'svix-timestamp': svixTimestamp || '',
+      'svix-signature': svixSignature,
+    });
   } catch (err) {
-    return errorResponse(c, 401, 'Unauthorized', 'Failed to verify webhook');
+    console.error('Webhook verification failed:', err);
+    return errorResponse(c, 401, 'Unauthorized', 'Invalid webhook signature');
   }
 
   let payload: ClerkWebhookPayload;
@@ -69,15 +75,17 @@ webhooksRoutes.post('/clerk', async (c) => {
   try {
     switch (type) {
       case 'user.created': {
-        const primaryEmail = data.email_addresses?.[0]?.email_address || null;
-        const emailVerified = data.email_addresses?.[0]?.verification?.status === 'verified';
-        const phoneNumber = data.phone_numbers?.[0]?.phone_number || null;
+        const emailEntry = data.email_addresses?.[0];
+        const email = emailEntry?.email_address?.trim() || null;
+        const emailVerified = emailEntry?.verification?.status === 'verified';
+        const phoneEntry = data.phone_numbers?.[0];
+        const phoneNumber = phoneEntry?.phone_number || null;
         const signUpMethod = data.external_accounts?.[0]?.provider || 'email';
 
         await db.insert(users).values({
-          id: data.id,
+          id: crypto.randomUUID(),
           clerkUserId: data.id,
-          email: primaryEmail,
+          email,
           emailVerified,
           name: data.first_name && data.last_name
             ? `${data.first_name} ${data.last_name}`
@@ -99,13 +107,14 @@ webhooksRoutes.post('/clerk', async (c) => {
       }
 
       case 'user.updated': {
-        const primaryEmail = data.email_addresses?.[0]?.email_address || null;
+        const primaryEmail = data.email_addresses?.[0]?.email_address;
+        const email = primaryEmail === '' || primaryEmail === undefined ? null : primaryEmail;
         const emailVerified = data.email_addresses?.[0]?.verification?.status === 'verified';
         const phoneNumber = data.phone_numbers?.[0]?.phone_number || null;
 
         await db.update(users)
           .set({
-            email: primaryEmail,
+            email,
             emailVerified,
             name: data.first_name && data.last_name
               ? `${data.first_name} ${data.last_name}`
@@ -153,42 +162,3 @@ webhooksRoutes.post('/clerk', async (c) => {
     return errorResponse(c, 500, 'ServerError', 'Failed to process webhook');
   }
 });
-
-async function verifyClerkWebhook(
-  payload: string,
-  signature: string,
-  secret: string
-): Promise<boolean> {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['verify']
-  );
-
-  const [timestampPart, signaturePart] = signature.split('t=');
-  if (!timestampPart || !signaturePart) {
-    return false;
-  }
-
-  const timestamp = timestampPart.trim();
-  const expectedSignature = signaturePart.trim();
-
-  const signedPayload = `${timestamp}.${payload}`;
-
-  const decodedSignature = Uint8Array.from(
-    atob(expectedSignature.replace(/\s/g, '')),
-    (c) => c.charCodeAt(0)
-  );
-
-  const isValid = await crypto.subtle.verify(
-    'HMAC',
-    key,
-    decodedSignature,
-    encoder.encode(signedPayload)
-  );
-
-  return isValid;
-}
