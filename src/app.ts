@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { timing } from 'hono/timing';
 
+import { CORS_ORIGINS } from './config/constants.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { permissionsRoutes } from './modules/permissions/permissions.routes.js';
 import { productsRoutes } from './modules/products/products.routes.js';
@@ -34,12 +35,7 @@ export function createApp() {
   app.use(
     '*',
     cors({
-      origin: [
-        'http://localhost:3000',
-        'http://localhost:8081',
-        'https://btracker-mobile.vercel.app',
-        'exp://*',
-      ],
+      origin: CORS_ORIGINS,
       credentials: true,
     })
   );
