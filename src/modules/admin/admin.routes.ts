@@ -60,6 +60,11 @@ adminRoutes.post('/stores/:id/activate', async (c) => {
   const auth = getAuth(c);
   if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
 
+  const isAdmin = await adminService.isAdmin(c.env, auth.clerkUserId);
+  if (!isAdmin) {
+    return errorResponse(c, 403, 'Forbidden', 'Only admins can activate stores');
+  }
+
   const id = c.req.param('id');
 
   try {
@@ -75,6 +80,6 @@ adminRoutes.get('/is-admin', async (c) => {
   const auth = getAuth(c);
   if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
 
-  const isAdmin = await adminService.isAdmin(c.env, auth.userId);
+  const isAdmin = await adminService.isAdmin(c.env, auth.clerkUserId);
   return successResponse(c, { isAdmin });
 });

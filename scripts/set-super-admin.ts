@@ -26,13 +26,10 @@ async function setSuperAdmin() {
   };
 
   try {
+    await sql`DELETE FROM btracker_admin_roles WHERE user_id = ${userId}`;
     await sql`
       INSERT INTO btracker_admin_roles (id, user_id, role, permissions, created_at, updated_at)
       VALUES (${crypto.randomUUID()}, ${userId}, 'super_admin', ${JSON.stringify(permissions)}, NOW(), NOW())
-      ON CONFLICT (user_id) DO UPDATE SET
-        role = 'super_admin',
-        permissions = ${JSON.stringify(permissions)},
-        updated_at = NOW()
     `;
     console.log(`✓ Successfully set super admin for user ${userId}`);
   } catch (err) {
