@@ -213,7 +213,7 @@ walletsRoutes.post('/expense-categories/:storeId', requirePermissions(['can_mana
   try {
     const body = await c.req.json();
     const data = createExpenseCategorySchema.parse(body);
-    const category = await walletsService.createExpenseCategory(c.env, { ...data, createdBy: auth.userId });
+    const category = await walletsService.createExpenseCategory(c.env, { ...data, storeId, createdBy: auth.userId });
     return successResponse(c, category, 'Expense category created successfully');
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to create expense category';

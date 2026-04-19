@@ -265,7 +265,7 @@ export const walletsRepository = {
       }
     })
     .from(memberWallets)
-    .innerJoin(users, eq(memberWallets.memberUserId, users.id))
+    .innerJoin(users, eq(memberWallets.memberUserId, users.clerkUserId))
     .where(eq(memberWallets.storeId, storeId))
     .orderBy(desc(memberWallets.updatedAt))
     .limit(limit)

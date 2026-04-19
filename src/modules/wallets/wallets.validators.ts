@@ -47,7 +47,7 @@ export const createExpenseCategorySchema = z.object({
 });
 
 export const updateExpenseCategorySchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().uuid().optional(),
   name: z.string().trim().min(1).max(100).optional(),
   description: z.string().trim().max(300).optional(),
   sortOrder: z.coerce.number().int().min(0).max(1000).optional(),
