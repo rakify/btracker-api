@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { getAuth } from '../../middlewares/auth.middleware.js';
 import { customersService } from './customers.service.js';
-import { createCustomerSchema, updateCustomerSchema, customerQuerySchema, customerOrdersQuerySchema } from './customers.validators.js';
+import { customerTransactionsService } from '../customer-transactions/customer-transactions.service.js';
+import { createCustomerSchema, updateCustomerSchema, customerQuerySchema, customerOrdersQuerySchema, addBalanceSchema } from './customers.validators.js';
 import { successResponse, errorResponse } from '../../lib/response.js';
 import type { Env } from '../../config/env.js';
 
@@ -113,6 +114,30 @@ customersRoutes.delete('/:id', async (c) => {
   return successResponse(c, null, 'Customer deleted successfully');
 });
 
+customersRoutes.post('/:id/balance', async (c) => {
+  const auth = getAuth(c);
+  if (!auth) {
+    return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
+  }
+
+  const customerId = c.req.param('id');
+  const storeId = c.req.query('storeId');
+
+  if (!storeId) {
+    return errorResponse(c, 400, 'ValidationError', 'storeId is required');
+  }
+
+  try {
+    const body = await c.req.json();
+    const data = addBalanceSchema.parse({ ...body, storeId });
+    const result = await customersService.addBalance(c.env, data, customerId);
+    return successResponse(c, result, 'Balance added successfully');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to add balance';
+    return errorResponse(c, 400, 'ValidationError', message);
+  }
+});
+
 customersRoutes.get('/:id/orders', async (c) => {
   const auth = getAuth(c);
   if (!auth) {
@@ -143,5 +168,26 @@ customersRoutes.get('/:id/orders', async (c) => {
     return successResponse(c, result);
   } catch (error) {
     return errorResponse(c, 500, 'ServerError', 'Failed to fetch customer orders');
+  }
+});
+
+customersRoutes.get('/:id/transactions', async (c) => {
+  const auth = getAuth(c);
+  if (!auth) {
+    return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
+  }
+
+  const storeId = c.req.query('storeId');
+  const customerId = c.req.param('id');
+
+  if (!storeId) {
+    return errorResponse(c, 400, 'BadRequest', 'storeId is required');
+  }
+
+  try {
+    const result = await customerTransactionsService.findByCustomerId(c.env, { storeId, customerId });
+    return successResponse(c, result);
+  } catch (error) {
+    return errorResponse(c, 500, 'ServerError', 'Failed to fetch customer transactions');
   }
 });

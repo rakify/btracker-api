@@ -30,6 +30,12 @@ export const customerQuerySchema = z.object({
   sort: z.string().optional(),
 });
 
+export const addBalanceSchema = z.object({
+  storeId: z.string().uuid(),
+  amount: z.number().or(z.string()),
+  note: z.string().optional(),
+});
+
 export const customerOrdersQuerySchema = z.object({
   page: z.number().default(1),
   per_page: z.number().default(10),

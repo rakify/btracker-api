@@ -1,6 +1,6 @@
 import { desc, eq, and, count, like, asc, gte, lte, isNotNull, isNull } from 'drizzle-orm';
 import { getDb } from '../../db/client.js';
-import { customers, orders, orderProducts, products, userProfiles } from '../../db/schema/index.js';
+import { customers, orders, orderProducts, products, userProfiles, customerTransactions } from '../../db/schema/index.js';
 import type { CreateCustomerInput, UpdateCustomerInput, CustomerQuery, CustomerOrdersQuery } from './customers.validators.js';
 import type { Env } from '../../config/env.js';
 
@@ -140,6 +140,43 @@ export const customersRepository = {
     });
   },
 
+  async addBalance(env: Env, data: { storeId: string; amount: number | string; note?: string }, customerId: string) {
+    const db = getDb(env);
+    const now = new Date();
+    const numericAmount = typeof data.amount === 'string' ? parseFloat(data.amount) : data.amount;
+
+    const customer = await db.query.customers.findFirst({
+      where: eq(customers.id, customerId),
+    });
+
+    if (!customer) {
+      throw new Error('Customer not found');
+    }
+
+    const previousBalance = parseFloat(customer.balance) || 0;
+    const newBalance = previousBalance + numericAmount;
+
+    await db.insert(customerTransactions).values({
+      id: crypto.randomUUID(),
+      storeId: data.storeId,
+      customerId: customerId,
+      transactionType: 'adjustment',
+      amount: String(numericAmount),
+      previousBalance: String(previousBalance),
+      newBalance: String(newBalance),
+      note: data.note,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const [updatedCustomer] = await db.update(customers)
+      .set({ balance: String(newBalance), updatedAt: now })
+      .where(eq(customers.id, customerId))
+      .returning();
+
+    return updatedCustomer;
+  },
+
   async findCustomerOrders(env: Env, query: CustomerOrdersQuery) {
     const db = getDb(env);
     const { page, per_page, storeId, customerId, from, to, sort, createdBy } = query;
@@ -163,35 +200,26 @@ export const customersRepository = {
 
     const safeColumn = column && sortableColumns[column] ? sortableColumns[column] : orders.createdAt;
 
+    const baseConditions = [
+      eq(orders.storeId, storeId),
+      eq(orders.customerId, customerId),
+      fromDay && toDay ? and(gte(orders.createdAt, fromDay), lte(orders.createdAt, toDay)) : undefined,
+      createdBy ? eq(orders.createdBy, createdBy) : undefined
+    ].filter(Boolean);
+
+    const whereClause = baseConditions.length > 1 ? and(...baseConditions) : baseConditions[0];
+
     const [ordersData, totalCount] = await Promise.all([
-      db.query.orders.findMany({
-        where: and(
-          eq(orders.storeId, storeId),
-          eq(orders.customerId, customerId),
-          fromDay && toDay ? and(gte(orders.createdAt, fromDay), lte(orders.createdAt, toDay)) : undefined,
-          createdBy ? eq(orders.createdBy, createdBy) : undefined
-        ),
-        with: {
-          products: {
-            with: {
-              product: true,
-            },
-          },
-          createdByUser: true,
-        },
-        limit,
-        offset,
-        orderBy: order === "asc" ? asc(safeColumn) : desc(safeColumn),
-      }),
+      db.select()
+        .from(orders)
+        .where(whereClause)
+        .limit(limit)
+        .offset(offset)
+        .orderBy(order === "asc" ? asc(safeColumn) : desc(safeColumn)),
       db
         .select({ count: count(orders.id) })
         .from(orders)
-        .where(and(
-          eq(orders.storeId, storeId),
-          eq(orders.customerId, customerId),
-          fromDay && toDay ? and(gte(orders.createdAt, fromDay), lte(orders.createdAt, toDay)) : undefined,
-          createdBy ? eq(orders.createdBy, createdBy) : undefined
-        ))
+        .where(whereClause)
         .then((res) => res[0]?.count ?? 0),
     ]);
 

@@ -30,4 +30,8 @@ export const customersService = {
   async findCustomerOrders(env: Env, query: CustomerOrdersQuery) {
     return customersRepository.findCustomerOrders(env, query);
   },
+
+  async addBalance(env: Env, data: { storeId: string; amount: number | string; note?: string }, customerId: string) {
+    return customersRepository.addBalance(env, data, customerId);
+  },
 };

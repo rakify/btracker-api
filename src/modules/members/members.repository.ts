@@ -21,7 +21,7 @@ export const membersRepository = {
         roleName: roles.name,
       })
       .from(userRoles)
-      .leftJoin(users, eq(userRoles.userId, users.id))
+      .leftJoin(users, eq(userRoles.userId, users.clerkUserId))
       .leftJoin(roles, eq(userRoles.roleId, roles.id))
       .where(eq(userRoles.storeId, storeId))
       .orderBy(desc(users.createdAt))
@@ -52,7 +52,7 @@ export const membersRepository = {
         roleName: roles.name,
       })
       .from(userRoles)
-      .leftJoin(users, eq(userRoles.userId, users.id))
+      .leftJoin(users, eq(userRoles.userId, users.clerkUserId))
       .leftJoin(roles, eq(userRoles.roleId, roles.id))
       .where(eq(userRoles.userId, userId))
       .limit(1);

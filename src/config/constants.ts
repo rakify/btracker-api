@@ -6,9 +6,7 @@ export const DEFAULT_LIMIT = 20;
 export const MAX_LIMIT = 100;
 
 export const CORS_ORIGINS = [
-  'http://localhost:8081',
-  'https://btracker-mobile.vercel.app',
-  'exp://*',
+  'http://localhost:3000',
   'https://grizmocradle.com',
   'https://www.grizmocradle.com',
 ];

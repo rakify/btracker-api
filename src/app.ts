@@ -33,28 +33,26 @@ export function createApp() {
 
   app.use('*', logger());
   app.use('*', timing());
-  app.use(
-    '*',
-    cors({
-      origin: CORS_ORIGINS,
-      credentials: true,
-    })
-  );
+  app.use('*', async (c, next) => {
+    const origin = c.req.header('origin') || '';
+    const isOptions = c.req.method === 'OPTIONS';
 
-  app.get('/health', c =>
-    c.json({
-      success: true,
-      data: {
-        status: 'ok',
-        timestamp: Date.now(),
-      },
-    })
-  );
+    if (isOptions || CORS_ORIGINS.includes(origin) || CORS_ORIGINS.some(o => o.includes('*') && origin.match(o.replace('*', '.*')))) {
+      c.header('access-control-allow-origin', origin);
+      c.header('access-control-allow-credentials', 'true');
+      c.header('access-control-allow-methods', 'GET,HEAD,PUT,POST,DELETE,PATCH');
+      c.header('access-control-allow-headers', 'Authorization,Content-Type');
+      if (isOptions) {
+        return c.body(null, 204);
+      }
+    }
+    await next();
+  });
 
   // Webhook routes (no auth needed)
   app.route('/webhooks', webhooksRoutes);
 
-  // Protected routes
+  // Protected API routes
   app.use('/api/*', authMiddleware);
   app.route('/api/auth', authRoutes);
   app.route('/api/permissions', permissionsRoutes);
