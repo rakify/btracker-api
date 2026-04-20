@@ -13,11 +13,87 @@ export const storesService = {
       throw new Error('Store name already taken');
     }
 
-    // Force active to false when creating - store must be activated by super admin
-    const storeData = { ...data, active: false };
+    // Check if user has any existing stores
+    const storeCount = await storesRepository.countByUser(env, userId);
+    const isFirstStore = storeCount === 0;
+
+    // Auto-activate if this is the user's first store
+    const storeData = { ...data, active: isFirstStore };
     const store = await storesRepository.create(env, storeData, userId);
 
+    // If this is the first store, set up roles and permissions immediately
+    if (isFirstStore && store) {
+      await this.setupStoreRoles(env, store.id, store.userId, userId);
+    }
+
     return store;
+  },
+
+  async setupStoreRoles(env: Env, storeId: string, storeUserId: string, activatedBy: string) {
+    const db = getDb(env);
+    const now = new Date();
+
+    // Get all permissions
+    const allPermissions = await db.select({ id: permissions.id, name: permissions.name }).from(permissions);
+
+    // Create Admin role with all permissions
+    const [adminRole] = await db.insert(roles).values({
+      id: crypto.randomUUID(),
+      name: 'Admin',
+      storeId,
+      createdBy: activatedBy,
+      createdAt: now,
+      updatedAt: now,
+    }).returning();
+
+    for (const permission of allPermissions) {
+      await db.insert(rolePermissions).values({
+        roleId: adminRole.id,
+        permissionId: permission.id,
+      });
+    }
+
+    // Assign Admin role to store creator
+    await db.insert(userRoles).values({
+      userId: storeUserId,
+      roleId: adminRole.id,
+      storeId,
+    });
+
+    // Create Manager role with limited permissions
+    const [managerRole] = await db.insert(roles).values({
+      id: crypto.randomUUID(),
+      name: 'Manager',
+      storeId,
+      createdBy: activatedBy,
+      createdAt: now,
+      updatedAt: now,
+    }).returning();
+
+    const viewPermissions = allPermissions.filter(p =>
+      p.name?.startsWith('can_view')
+    );
+    for (const permission of viewPermissions) {
+      await db.insert(rolePermissions).values({
+        roleId: managerRole.id,
+        permissionId: permission.id,
+      });
+    }
+
+    // Create Staff role
+    await db.insert(roles).values({
+      id: crypto.randomUUID(),
+      name: 'Staff',
+      storeId,
+      createdBy: activatedBy,
+      createdAt: now,
+      updatedAt: now,
+    }).returning();
+
+    // Update store to active
+    await db.update(stores)
+      .set({ active: true, activeSince: now })
+      .where(eq(stores.id, storeId));
   },
 
   async activateStore(env: Env, storeId: string, userId: string) {

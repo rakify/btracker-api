@@ -89,6 +89,12 @@ export const storesRepository = {
     });
   },
 
+  async countByUser(env: Env, userId: string) {
+    const db = getDb(env);
+    const [result] = await db.select({ count: count() }).from(stores).where(eq(stores.userId, userId));
+    return result?.count || 0;
+  },
+
   async findPending(env: Env) {
     const db = getDb(env);
     return db.query.stores.findMany({
