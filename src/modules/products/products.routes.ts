@@ -41,6 +41,33 @@ productsRoutes.get('/', async (c) => {
   }
 });
 
+productsRoutes.get('/custom', async (c) => {
+  const auth = getAuth(c);
+  if (!auth) {
+    return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
+  }
+
+  const storeId = c.req.query('storeId');
+  if (!storeId) {
+    return errorResponse(c, 400, 'ValidationError', 'storeId is required');
+  }
+
+  try {
+    const queryData = {
+      page: parseInt(c.req.query('page') || '1'),
+      limit: parseInt(c.req.query('limit') || '20'),
+      storeId,
+      isCustom: 'true',
+      status: 'active' as const,
+    };
+    const result = await productsService.findAll(c.env, queryData as any);
+    return paginatedResponse(c, result.data, queryData.page, queryData.limit, result.total);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to fetch custom products';
+    return errorResponse(c, 500, 'ServerError', message);
+  }
+});
+
 productsRoutes.get('/:id', async (c) => {
   const auth = getAuth(c);
   if (!auth) {
@@ -106,4 +133,37 @@ productsRoutes.delete('/:id', requirePermissions(['can_manage_products']), async
   const id = c.req.param('id');
   await productsService.delete(c.env, id);
   return successResponse(c, null, 'Product deleted successfully');
+});
+
+productsRoutes.delete('/custom/:id', requirePermissions(['can_manage_products']), async (c) => {
+  const auth = getAuth(c);
+  if (!auth) {
+    return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
+  }
+
+  const id = c.req.param('id');
+  await productsService.delete(c.env, id);
+  return successResponse(c, null, 'Custom product deleted successfully');
+});
+
+productsRoutes.post('/custom', requirePermissions(['can_manage_products']), async (c) => {
+  const auth = getAuth(c);
+  if (!auth) {
+    return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
+  }
+
+  const storeId = c.req.query('storeId');
+  if (!storeId) {
+    return errorResponse(c, 400, 'ValidationError', 'storeId is required');
+  }
+
+  try {
+    const body = await c.req.json();
+    const data = createProductSchema.parse({ ...body, storeId, isCustom: true });
+    const product = await productsService.create(c.env, { ...data, createdBy: auth.userId });
+    return successResponse(c, product, 'Custom product created successfully');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to create custom product';
+    return errorResponse(c, 400, 'ValidationError', message);
+  }
 });
