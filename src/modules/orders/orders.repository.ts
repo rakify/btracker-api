@@ -1,6 +1,6 @@
-import { desc, eq, and, count, gte, lte } from 'drizzle-orm';
+import { desc, eq, and, count, gte, lte, sql } from 'drizzle-orm';
 import { getDb } from '../../db/client.js';
-import { orders, orderProducts, customers } from '../../db/schema/index.js';
+import { orders, orderProducts, customers, products, inventoryLogs } from '../../db/schema/index.js';
 import type { CreateOrderInput, UpdateOrderInput, OrderQuery } from './orders.validators.js';
 import type { Env } from '../../config/env.js';
 
@@ -30,6 +30,9 @@ export const ordersRepository = {
 
     const productEntries = Object.entries(data.products);
     for (const [productId, product] of productEntries) {
+      const qty = Number(product.quantity) || 0;
+      if (qty <= 0) continue;
+
       await db.insert(orderProducts).values({
         id: crypto.randomUUID(),
         storeId: data.storeId,
@@ -45,6 +48,41 @@ export const ordersRepository = {
         createdAt: now,
         updatedAt: now,
       });
+
+      // Deduct inventory for non-custom, non-pre-order products
+      const effectiveProductId = product.productId || productId;
+      if (effectiveProductId && !product.allowPreOrder) {
+        const [currentProduct] = await db
+          .select({ inventory: products.inventory })
+          .from(products)
+          .where(eq(products.id, effectiveProductId))
+          .limit(1);
+
+        if (currentProduct) {
+          const prevQty = Number(currentProduct.inventory);
+          const newQty = Math.max(0, prevQty - qty);
+          await db
+            .update(products)
+            .set({ inventory: newQty, updatedAt: now })
+            .where(eq(products.id, effectiveProductId));
+
+          await db.insert(inventoryLogs).values({
+            id: crypto.randomUUID(),
+            storeId: data.storeId,
+            type: 'sale',
+            productId: effectiveProductId,
+            orderId: order.id,
+            customerId: data.customerId,
+            userId: data.createdBy,
+            quantityChanged: String(-qty),
+            previousQuantity: String(prevQty),
+            newQuantity: String(newQty),
+            priceAtTransaction: String(product.price),
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      }
     }
 
     return order;
