@@ -26,7 +26,7 @@ export const storesService = {
       await this.setupStoreRoles(env, store.id, store.userId, userId);
     }
 
-    return store;
+    return { store, isFirstStore };
   },
 
   async setupStoreRoles(env: Env, storeId: string, storeUserId: string, activatedBy: string) {
@@ -179,8 +179,8 @@ export const storesService = {
     return storesRepository.update(env, id, data);
   },
 
-  async delete(env: Env, id: string) {
-    return storesRepository.delete(env, id);
+  async delete(env: Env, id: string, deletedBy: string) {
+    return storesRepository.delete(env, id, deletedBy);
   },
 
   async findAll(env: Env, query: StoreQuery) {
@@ -193,5 +193,10 @@ export const storesService = {
 
   async findPending(env: Env) {
     return storesRepository.findPending(env);
+  },
+
+  async getOwnerId(env: Env, id: string): Promise<string | null> {
+    const store = await storesRepository.findById(env, id);
+    return store?.userId ?? null;
   },
 };

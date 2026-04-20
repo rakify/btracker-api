@@ -16,8 +16,11 @@ storesRoutes.post('/', async (c) => {
   try {
     const body = await c.req.json();
     const data = createStoreSchema.parse(body);
-    const store = await storesService.create(c.env, data, auth.userId);
-    return successResponse(c, store, 'Store created successfully. Pending activation by admin.');
+    const { store, isFirstStore } = await storesService.create(c.env, data, auth.userId);
+    const message = isFirstStore
+      ? 'Store created and activated successfully.'
+      : 'Store created successfully. Pending activation by admin.';
+    return successResponse(c, store, message);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to create store';
     return errorResponse(c, 400, 'ValidationError', message);
@@ -111,6 +114,21 @@ storesRoutes.delete('/:id', async (c) => {
   }
 
   const id = c.req.param('id');
-  await storesService.delete(c.env, id);
-  return successResponse(c, null, 'Store deleted successfully');
+
+  // Authorization: only store owner can delete
+  const ownerId = await storesService.getOwnerId(c.env, id);
+  if (!ownerId) {
+    return errorResponse(c, 404, 'NotFound', 'Store not found');
+  }
+  if (ownerId !== auth.userId) {
+    return errorResponse(c, 403, 'Forbidden', 'Only the store owner can delete the store');
+  }
+
+  try {
+    await storesService.delete(c.env, id, auth.userId);
+    return successResponse(c, null, 'Store deleted successfully');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to delete store';
+    return errorResponse(c, 400, 'ValidationError', message);
+  }
 });

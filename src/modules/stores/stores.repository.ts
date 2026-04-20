@@ -1,4 +1,4 @@
-import { desc, eq, and, count } from 'drizzle-orm';
+import { desc, eq, and, count, isNull } from 'drizzle-orm';
 import { getDb } from '../../db/client.js';
 import { stores, users } from '../../db/schema/index.js';
 import type { CreateStoreInput, UpdateStoreInput, StoreQuery } from './stores.validators.js';
@@ -29,14 +29,14 @@ export const storesRepository = {
   async findById(env: Env, id: string) {
     const db = getDb(env);
     return db.query.stores.findFirst({
-      where: eq(stores.id, id),
+      where: and(eq(stores.id, id), isNull(stores.deletedAt)),
     });
   },
 
   async findBySlug(env: Env, slug: string) {
     const db = getDb(env);
     return db.query.stores.findFirst({
-      where: eq(stores.slug, slug),
+      where: and(eq(stores.slug, slug), isNull(stores.deletedAt)),
     });
   },
 
@@ -49,10 +49,10 @@ export const storesRepository = {
     return store;
   },
 
-  async delete(env: Env, id: string) {
+  async delete(env: Env, id: string, deletedBy: string) {
     const db = getDb(env);
     await db.update(stores)
-      .set({ deletedAt: new Date() })
+      .set({ deletedAt: new Date(), deletedBy })
       .where(eq(stores.id, id));
   },
 
@@ -84,21 +84,21 @@ export const storesRepository = {
   async findByUser(env: Env, userId: string) {
     const db = getDb(env);
     return db.query.stores.findMany({
-      where: eq(stores.userId, userId),
+      where: and(eq(stores.userId, userId), isNull(stores.deletedAt)),
       orderBy: desc(stores.createdAt),
     });
   },
 
   async countByUser(env: Env, userId: string) {
     const db = getDb(env);
-    const [result] = await db.select({ count: count() }).from(stores).where(eq(stores.userId, userId));
+    const [result] = await db.select({ count: count() }).from(stores).where(and(eq(stores.userId, userId), isNull(stores.deletedAt)));
     return result?.count || 0;
   },
 
   async findPending(env: Env) {
     const db = getDb(env);
     return db.query.stores.findMany({
-      where: eq(stores.active, false),
+      where: and(eq(stores.active, false), isNull(stores.deletedAt)),
       orderBy: desc(stores.createdAt),
     });
   },
