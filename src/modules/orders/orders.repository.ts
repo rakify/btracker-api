@@ -1,6 +1,6 @@
 import { desc, eq, and, count, gte, lte, sql } from 'drizzle-orm';
 import { getDb } from '../../db/client.js';
-import { orders, orderProducts, customers, products, inventoryLogs } from '../../db/schema/index.js';
+import { orders, orderProducts, customers, products, inventoryLogs, users } from '../../db/schema/index.js';
 import type { CreateOrderInput, UpdateOrderInput, OrderQuery } from './orders.validators.js';
 import type { Env } from '../../config/env.js';
 
@@ -136,15 +136,18 @@ export const ordersRepository = {
 
     const ordersWithRelations = await Promise.all(
       ordersData.map(async (order) => {
-        const [orderItems, customer] = await Promise.all([
+        const [orderItems, customer, user] = await Promise.all([
           db.select().from(orderProducts).where(eq(orderProducts.orderId, order.id)),
           db.select().from(customers).where(eq(customers.id, order.customerId)).limit(1),
+          order.createdBy
+            ? db.select({ name: users.name, email: users.email }).from(users).where(eq(users.clerkUserId, order.createdBy)).limit(1)
+            : Promise.resolve([]),
         ]);
 
         return {
           ...order,
           customer: customer[0] ? { id: customer[0].id, name: customer[0].name } : { id: order.customerId, name: 'Unknown' },
-          createdBy: { id: order.createdBy || '', email: null },
+          createdBy: { id: order.createdBy || '', name: user[0]?.name || 'Unknown', email: user[0]?.email || null },
           products: orderItems.map(item => ({
             productId: item.productId,
             name: item.name,
