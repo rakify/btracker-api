@@ -167,3 +167,56 @@ productsRoutes.post('/custom', requirePermissions(['can_manage_products']), asyn
     return errorResponse(c, 400, 'ValidationError', message);
   }
 });
+
+productsRoutes.post('/batch-import', requirePermissions(['can_manage_products']), async (c) => {
+  const auth = getAuth(c);
+  if (!auth) {
+    return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
+  }
+
+  const storeId = c.req.query('storeId');
+  if (!storeId) {
+    return errorResponse(c, 400, 'ValidationError', 'storeId is required');
+  }
+
+  try {
+    const body = await c.req.json();
+    const { products: productList } = body as {
+      products: Array<{
+        name: string;
+        description?: string;
+        price: number;
+        inventory?: number;
+        allowPreOrder?: boolean;
+        acceptCommission?: boolean;
+        isCustom?: boolean;
+        tags?: string[];
+      }>;
+    };
+
+    if (!Array.isArray(productList) || productList.length === 0) {
+      return errorResponse(c, 400, 'ValidationError', 'products array is required and must not be empty');
+    }
+
+    const results = await productsService.batchCreate(c.env, storeId, auth.userId, productList);
+
+    const created = results.filter(r => r.success).length;
+    const errors: Array<{ index: number; name: string; error: string }> = [];
+
+    results.forEach((result, index) => {
+      if (!result.success) {
+        const product = productList[index];
+        errors.push({
+          index,
+          name: product?.name ?? 'Unknown',
+          error: result.error instanceof Error ? result.error.message : 'Failed to create product',
+        });
+      }
+    });
+
+    return successResponse(c, { created, errors }, `Batch import completed: ${created} created, ${errors.length} failed`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to batch import products';
+    return errorResponse(c, 400, 'ValidationError', message);
+  }
+});

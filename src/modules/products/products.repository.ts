@@ -68,6 +68,47 @@ export const productsRepository = {
     await db.update(products).set({ deletedAt: new Date() }).where(eq(products.id, id));
   },
 
+  async batchCreate(env: Env, storeId: string, createdBy: string, productList: Array<{
+    name: string;
+    description?: string;
+    price: number;
+    inventory?: number;
+    allowPreOrder?: boolean;
+    acceptCommission?: boolean;
+    isCustom?: boolean;
+    tags?: string[];
+  }>) {
+    const db = getDb(env);
+    const now = new Date();
+    const results = [];
+    for (const item of productList) {
+      try {
+        const [product] = await db
+          .insert(products)
+          .values({
+            id: crypto.randomUUID(),
+            storeId,
+            name: item.name,
+            description: item.description,
+            price: String(item.price),
+            allowPreOrder: item.allowPreOrder ?? false,
+            acceptCommission: item.acceptCommission ?? false,
+            isCustom: item.isCustom ?? false,
+            inventory: item.inventory ?? 0,
+            tags: item.tags,
+            createdAt: now,
+            updatedAt: now,
+            createdBy,
+          })
+          .returning();
+        results.push({ success: true, product });
+      } catch (error) {
+        results.push({ success: false, error });
+      }
+    }
+    return results;
+  },
+
   async findAll(env: Env, query: ProductQuery) {
     const db = getDb(env);
     const {

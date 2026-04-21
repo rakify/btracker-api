@@ -22,4 +22,17 @@ export const productsService = {
   async findAll(env: Env, query: ProductQuery) {
     return productsRepository.findAll(env, query);
   },
+
+  async batchCreate(env: Env, storeId: string, createdBy: string, productList: Array<{
+    name: string;
+    description?: string;
+    price: number;
+    inventory?: number;
+    allowPreOrder?: boolean;
+    acceptCommission?: boolean;
+    isCustom?: boolean;
+    tags?: string[];
+  }>) {
+    return productsRepository.batchCreate(env, storeId, createdBy, productList);
+  },
 };
