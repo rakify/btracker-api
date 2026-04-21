@@ -49,17 +49,16 @@ export const ordersRepository = {
         updatedAt: now,
       });
 
-      // Deduct inventory for non-custom, non-pre-order products
       const effectiveProductId = product.productId || productId;
       if (effectiveProductId && !product.allowPreOrder) {
-        const [currentProduct] = await db
-          .select({ inventory: products.inventory })
-          .from(products)
-          .where(eq(products.id, effectiveProductId))
-          .limit(1);
+        // Lock row to prevent concurrent race conditions
+        const result = await db.execute(
+          sql`SELECT inventory FROM btracker_products WHERE id = ${effectiveProductId} FOR UPDATE`
+        ) as { rows: { inventory: number }[] };
 
-        if (currentProduct) {
-          const prevQty = Number(currentProduct.inventory);
+        const row = result.rows[0];
+        if (row && row.inventory !== undefined) {
+          const prevQty = Number(row.inventory);
           const newQty = Math.max(0, prevQty - qty);
           await db
             .update(products)
@@ -93,7 +92,7 @@ export const ordersRepository = {
     const order = await db.query.orders.findFirst({
       where: eq(orders.id, id),
     });
-    
+
     if (order) {
       const orderItems = await db.select().from(orderProducts).where(eq(orderProducts.orderId, id));
       return { ...order, items: orderItems };
@@ -135,7 +134,6 @@ export const ordersRepository = {
       db.select({ count: count() }).from(orders).where(and(...where)),
     ]);
 
-    // Fetch related data for all orders in parallel
     const ordersWithRelations = await Promise.all(
       ordersData.map(async (order) => {
         const [orderItems, customer] = await Promise.all([
