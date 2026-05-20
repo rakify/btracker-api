@@ -90,7 +90,9 @@ export const inventoryLogsRepository = {
       ...log,
       product: log.productId ? productMap.get(log.productId) ?? null : null,
       customer: log.customerId ? customerMap.get(log.customerId) ?? null : null,
-      user: log.userId ? userMap.get(log.userId) ?? null : null,
+      user: log.userId
+        ? userMap.get(log.userId) ?? { id: log.userId, email: null }
+        : null,
     }));
 
     return {
