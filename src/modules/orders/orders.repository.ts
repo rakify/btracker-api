@@ -93,11 +93,49 @@ export const ordersRepository = {
       where: eq(orders.id, id),
     });
 
-    if (order) {
-      const orderItems = await db.select().from(orderProducts).where(eq(orderProducts.orderId, id));
-      return { ...order, items: orderItems };
+    if (!order) {
+      return null;
     }
-    return order;
+
+    const [items, customer, createdByUser] = await Promise.all([
+      db.select().from(orderProducts).where(eq(orderProducts.orderId, id)),
+      order.customerId
+        ? db.select().from(customers).where(eq(customers.id, order.customerId)).limit(1)
+        : Promise.resolve([] as any[]),
+      order.createdBy
+        ? db
+            .select({ name: users.name, email: users.email })
+            .from(users)
+            .where(eq(users.clerkUserId, order.createdBy))
+            .limit(1)
+        : Promise.resolve([] as { name: string | null; email: string | null }[]),
+    ]);
+
+    return {
+      ...order,
+      items,
+      products: items.map((item) => ({
+        productId: item.productId,
+        name: item.name,
+        quantity: item.quantity,
+        returnedQuantity: item.returnedQuantity,
+        price: item.price,
+        acceptCommission: item.acceptCommission,
+        allowPreOrder: item.allowPreOrder,
+      })),
+      customer: customer[0]
+        ? {
+            id: customer[0].id,
+            name: customer[0].name,
+            phone: customer[0].phone ?? null,
+          }
+        : { id: order.customerId, name: 'Unknown', phone: null },
+      createdBy: {
+        id: order.createdBy ?? '',
+        name: createdByUser[0]?.name || 'Unknown',
+        email: createdByUser[0]?.email || null,
+      },
+    };
   },
 
   async update(env: Env, id: string, data: UpdateOrderInput) {
