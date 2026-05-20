@@ -1,6 +1,6 @@
-import { desc, eq, and, count } from 'drizzle-orm';
+import { desc, eq, and, count, inArray } from 'drizzle-orm';
 import { getDb } from '../../db/client.js';
-import { inventoryLogs } from '../../db/schema/index.js';
+import { inventoryLogs, products, customers, users } from '../../db/schema/index.js';
 import type { CreateInventoryLogInput, InventoryLogQuery } from './inventory-logs.validators.js';
 import type { Env } from '../../config/env.js';
 
@@ -45,7 +45,7 @@ export const inventoryLogsRepository = {
     if (orderId) where.push(eq(inventoryLogs.orderId, orderId));
     if (type) where.push(eq(inventoryLogs.type, type));
 
-    const [data, totalResult] = await Promise.all([
+    const [logs, totalResult] = await Promise.all([
       db.select().from(inventoryLogs)
         .where(and(...where))
         .orderBy(desc(inventoryLogs.createdAt))
@@ -53,6 +53,45 @@ export const inventoryLogsRepository = {
         .offset(offset),
       db.select({ count: count() }).from(inventoryLogs).where(and(...where)),
     ]);
+
+    const productIds = Array.from(
+      new Set(logs.map((l) => l.productId).filter(Boolean) as string[]),
+    );
+    const customerIds = Array.from(
+      new Set(logs.map((l) => l.customerId).filter(Boolean) as string[]),
+    );
+    const userIds = Array.from(
+      new Set(logs.map((l) => l.userId).filter(Boolean) as string[]),
+    );
+
+    const [productRows, customerRows, userRows] = await Promise.all([
+      productIds.length
+        ? db.select({ id: products.id, name: products.name })
+            .from(products)
+            .where(inArray(products.id, productIds))
+        : Promise.resolve([] as { id: string; name: string }[]),
+      customerIds.length
+        ? db.select({ id: customers.id, name: customers.name })
+            .from(customers)
+            .where(inArray(customers.id, customerIds))
+        : Promise.resolve([] as { id: string; name: string }[]),
+      userIds.length
+        ? db.select({ id: users.clerkUserId, email: users.email })
+            .from(users)
+            .where(inArray(users.clerkUserId, userIds))
+        : Promise.resolve([] as { id: string; email: string | null }[]),
+    ]);
+
+    const productMap = new Map(productRows.map((p) => [p.id, p]));
+    const customerMap = new Map(customerRows.map((c) => [c.id, c]));
+    const userMap = new Map(userRows.map((u) => [u.id, u]));
+
+    const data = logs.map((log) => ({
+      ...log,
+      product: log.productId ? productMap.get(log.productId) ?? null : null,
+      customer: log.customerId ? customerMap.get(log.customerId) ?? null : null,
+      user: log.userId ? userMap.get(log.userId) ?? null : null,
+    }));
 
     return {
       data,
