@@ -84,6 +84,12 @@ export const ordersRepository = {
       }
     }
 
+    // Keep customer balance in sync with the order's finalReserve
+    await db
+      .update(customers)
+      .set({ balance: String(data.finalReserve), updatedAt: now })
+      .where(eq(customers.id, data.customerId));
+
     return order;
   },
 
