@@ -1,6 +1,6 @@
-import { eq, and, count, sum, isNull, desc, inArray } from 'drizzle-orm';
+import { eq, and, count, sum, isNull, desc, inArray, sql } from 'drizzle-orm';
 import { getDb } from '../../db/client.js';
-import { stores, products, orders, customers, activityLogs } from '../../db/schema/index.js';
+import { stores, products, orders, customers, activityLogs, users } from '../../db/schema/index.js';
 import type { DashboardQuery } from './dashboard.validators.js';
 import type { Env } from '../../config/env.js';
 
@@ -74,9 +74,11 @@ export const dashboardRepository = {
             id: stores.id,
             name: stores.name,
           },
+          createdByName: users.name,
         })
         .from(activityLogs)
         .leftJoin(stores, eq(activityLogs.storeId, stores.id))
+        .leftJoin(users, sql`${activityLogs.createdBy}::uuid = ${users.id}`)
         .where(inArray(activityLogs.storeId, storeIds))
         .orderBy(desc(activityLogs.createdAt))
         .limit(10),

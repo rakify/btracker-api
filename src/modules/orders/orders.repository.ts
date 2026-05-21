@@ -1,6 +1,6 @@
 import { desc, eq, and, count, gte, lte, sql } from 'drizzle-orm';
 import { getDb } from '../../db/client.js';
-import { orders, orderProducts, customers, products, inventoryLogs, users } from '../../db/schema/index.js';
+import { orders, orderProducts, customers, products, inventoryLogs, users, activityLogs, customerTransactions } from '../../db/schema/index.js';
 import type { CreateOrderInput, UpdateOrderInput, OrderQuery } from './orders.validators.js';
 import type { Env } from '../../config/env.js';
 
@@ -89,6 +89,44 @@ export const ordersRepository = {
       .update(customers)
       .set({ balance: String(data.finalReserve), updatedAt: now })
       .where(eq(customers.id, data.customerId));
+
+    // Record the balance change as a customer transaction
+    const txAmount = Number(data.finalReserve) - Number(data.previousReserve);
+    await db.insert(customerTransactions).values({
+      id: crypto.randomUUID(),
+      storeId: data.storeId,
+      customerId: data.customerId,
+      orderId: order.id,
+      transactionType: 'order',
+      amount: String(txAmount),
+      previousBalance: String(data.previousReserve),
+      newBalance: String(data.finalReserve),
+      note: `Order #${order.entryNo}`,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const creatorRow = data.createdBy
+      ? await db.select({ name: users.name }).from(users).where(eq(users.id, data.createdBy)).limit(1)
+      : [];
+
+    await db.insert(activityLogs).values({
+      id: crypto.randomUUID(),
+      storeId: data.storeId,
+      trackableType: 'order',
+      trackableId: order.id,
+      action: 'create_order',
+      createdBy: data.createdBy,
+      metadata: {
+        entryNo: order.entryNo,
+        total: data.totalCostWithCommission,
+        customerId: data.customerId,
+        productCount: Object.values(data.products).filter(p => Number(p.quantity) > 0).length,
+        createdByName: creatorRow[0]?.name ?? null,
+      },
+      createdAt: now,
+      updatedAt: now,
+    });
 
     return order;
   },
