@@ -77,6 +77,17 @@ adminRoutes.post('/stores/:id/activate', async (c) => {
   }
 });
 
+adminRoutes.get('/stores', async (c) => {
+  const auth = getAuth(c);
+  if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
+
+  const isAdmin = await adminService.isAdmin(c.env, auth.clerkUserId);
+  if (!isAdmin) return errorResponse(c, 403, 'Forbidden', 'Only admins can view stores');
+
+  const stores = await adminService.getAllStoresForAdmin(c.env);
+  return successResponse(c, { stores });
+});
+
 adminRoutes.get('/is-admin', async (c) => {
   const auth = getAuth(c);
   if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
