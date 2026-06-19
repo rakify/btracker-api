@@ -178,10 +178,11 @@ export const productsRepository = {
           deletedAt: products.deletedAt,
           createdBy: products.createdBy,
           deletedBy: products.deletedBy,
+          position: products.position,
         })
         .from(products)
         .where(whereClause)
-        .orderBy(order === 'asc' ? asc(safeColumn) : desc(safeColumn))
+        .orderBy(asc(products.position), order === 'asc' ? asc(safeColumn) : desc(safeColumn))
         .limit(limit)
         .offset(offset),
       db
@@ -195,5 +196,14 @@ export const productsRepository = {
       data,
       total: totalResult,
     };
+  },
+
+  async reorder(env: Env, items: { id: string; position: number }[]) {
+    const db = getDb(env);
+    await Promise.all(
+      items.map(({ id, position }) =>
+        db.update(products).set({ position }).where(eq(products.id, id))
+      )
+    );
   },
 };

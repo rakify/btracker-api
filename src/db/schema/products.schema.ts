@@ -11,6 +11,7 @@ export const products = pgTable('btracker_products', {
   acceptCommission: boolean('accept_commission').notNull(),
   isCustom: boolean('is_custom').notNull(),
   inventory: integer('inventory').notNull(),
+  position: integer('position'),
   tags: jsonb('tags'),
   createdAt: timestamp('created_at', { withTimezone: true }),
   updatedAt: timestamp('updated_at', { withTimezone: true }),

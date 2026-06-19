@@ -35,4 +35,8 @@ export const productsService = {
   }>) {
     return productsRepository.batchCreate(env, storeId, createdBy, productList);
   },
+
+  async reorder(env: Env, items: { id: string; position: number }[]) {
+    return productsRepository.reorder(env, items);
+  },
 };

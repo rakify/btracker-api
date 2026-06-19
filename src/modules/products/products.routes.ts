@@ -68,6 +68,23 @@ productsRoutes.get('/custom', async (c) => {
   }
 });
 
+productsRoutes.patch('/reorder', requirePermissions(['can_manage_products']), async (c) => {
+  const auth = getAuth(c);
+  if (!auth) return errorResponse(c, 401, 'Unauthorized', 'Not authenticated');
+
+  try {
+    const { items } = await c.req.json() as { items: { id: string; position: number }[] };
+    if (!Array.isArray(items) || items.length === 0) {
+      return errorResponse(c, 400, 'ValidationError', 'items array required');
+    }
+    await productsService.reorder(c.env, items);
+    return successResponse(c, null, 'Products reordered');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to reorder products';
+    return errorResponse(c, 500, 'ServerError', message);
+  }
+});
+
 productsRoutes.get('/:id', async (c) => {
   const auth = getAuth(c);
   if (!auth) {
